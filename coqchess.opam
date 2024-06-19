@@ -10,13 +10,12 @@ license: "GPL"
 synopsis: "Coq implementation of chess"
 
 build: [
-  ["./configure.sh"]
-  [make "-j%{jobs}%"]
+  [dune build]
 ]
-install: [make "install"]
+install: [dune install]
 
 depends: [
-  "ocaml" {= "4.14.0"}
+  "ocaml" {>= "4.14.0"}
   "coq" {(>= "8.15.2")}
 ]
 
