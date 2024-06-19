@@ -17,7 +17,7 @@ install: [make "install"]
 
 depends: [
   "ocaml" {= "4.14.0"}
-  "coq" {(= "8.15.2")}
+  "coq" {(>= "8.15.2")}
 ]
 
 authors: [
