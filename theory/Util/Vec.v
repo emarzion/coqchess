@@ -1,4 +1,6 @@
 Require Import Arith.
+Require Import List.
+Import ListNotations.
 Import Nat.
 
 Require Import Chess.Util.Fin.
@@ -70,3 +72,15 @@ Proof.
       intro; elim ij_neq.
       congruence.
 Qed.
+
+Fixpoint to_list {X} {n} : Vec X n -> list X :=
+  match n with
+  | 0 => fun _ => []
+  | S m => fun v => fst v :: to_list (snd v)
+  end.
+
+Fixpoint vmap {X Y} (f : X -> Y) {n} : Vec X n -> Vec Y n :=
+  match n with
+  | 0 => fun _ => tt
+  | S m => fun v => (f (fst v), vmap f (snd v))
+  end.

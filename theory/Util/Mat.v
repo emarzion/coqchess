@@ -2,6 +2,9 @@ Require Import Chess.Util.Dec.
 Require Import Chess.Util.Fin.
 Require Import Chess.Util.Vec.
 
+Require Import List.
+Import ListNotations.
+
 Definition Mat (X : Type) (m n : nat) : Type :=
   Vec (Vec X n) m.
 
@@ -61,3 +64,6 @@ Proof.
     rewrite maccess_mupdate_neq2; congruence.
   - rewrite maccess_mupdate_neq1; auto.
 Qed.
+
+Definition to_list {X} {m n} (M : Mat X m n) : list X :=
+  concat (Vec.to_list (vmap Vec.to_list M)).

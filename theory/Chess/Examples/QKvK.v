@@ -8,6 +8,24 @@ Require Import Games.Util.Dec.
 
 Require Import Chess.Util.Fin.
 
+Definition only_king (p : Player) (s : ChessState) : Prop :=
+  forall pos piece,
+    lookup_piece pos (board s) = Some (p, piece) ->
+    piece = King.
+
+Lemma only_king_cannot_checkmate p s :
+  only_king p s ->
+  ~ atomic_chess_res s = Some (Game.Win p).
+Proof.
+  intros Hs pf.
+  unfold atomic_chess_res in pf.
+  destruct enum_chess_moves; [|discriminate].
+  - destruct dec; [|discriminate].
+    
+ admit.
+
+Admitted.
+
 (** QKvK position with white to play or black to play with white queen not
     being threatened by the black king; and the position is not stalemate.
 *)
@@ -35,6 +53,14 @@ Arguments white_pieces {_}.
 Arguments black_pieces {_}.
 Arguments white_queen_unthreatened {_}.
 Arguments not_stalemate {_}.
+
+Lemma black_only_king s : t s -> only_king Black s.
+Proof.
+  intros t pos piece pf.
+  assert (pos = black_king s) by (apply t in pf; auto); subst.
+  rewrite lookup_black_king in pf.
+  inversion pf; auto.
+Qed.
 
 Module cutoff.
 
@@ -77,7 +103,8 @@ Proof.
     + destruct p.
       * apply atom_force; right.
         exact s_res.
-      * admit. (* easy contra *)
+      * apply only_king_cannot_checkmate in s_res; [tauto|].
+        apply black_only_king; auto.
     + elim (not_stalemate mat); auto.
   - destruct (chess_to_play s) eqn:s_play.
     + destruct (eq_dec (rank (white_queen mat)) (rank (black_king s))).
@@ -111,7 +138,6 @@ Admitted.
 
 End cutoff.
 
-Check cutoff.pforced.
 
 (* Lemma rank_ascending_forces :
   pforces White QKvK_white rank_ascending_QKvK_white.

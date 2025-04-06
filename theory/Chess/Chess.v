@@ -1465,5 +1465,3 @@ Proof.
     destruct dec; eexists; auto.
   }
 Defined.
-
-Print Assumptions ChessGame.
