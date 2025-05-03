@@ -11,6 +11,7 @@ Proof.
 Admitted.
 
 Global Instance ReverseChess : Reversible ChessGame.
+Proof.
 Admitted.
 
 Global Instance NiceChess : NiceGame ChessGame.
@@ -107,9 +108,12 @@ Admitted.
 Global Instance KRvK_closed : Closed.Closed KRvK.
 Proof.
   constructor.
-  intros s [pf1 pf2] m; split.
-  - 
-Admitted.
+  intros s pf m.
+  unfold KRvK.
+  apply TotalMaterial_le_trans with (t2 := get_material s).
+  - apply TotalMaterial_le_exec_move.
+  - exact pf.
+Qed.
 
 Global Instance KRvK_dec1 : Closed.Dec1 KRvK.
 Proof.
