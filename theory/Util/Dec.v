@@ -26,6 +26,7 @@ Proof.
   apply PeanoNat.Nat.eq_dec.
 Defined.
 
+(*
 Class Exhaustible (X : Type) := {
   sig_dec : forall (P : X -> Prop),
     (forall x, decision (P x)) ->
@@ -50,6 +51,43 @@ Proof.
   - right; intros [[x y] Hxy].
     apply n; exists x, y; exact Hxy.
 Defined.
+
+Global Instance sum_Exhaustible (X Y : Type) `{Exhaustible X, Exhaustible Y}
+  : Exhaustible (X + Y).
+Proof.
+  constructor.
+  intros P P_dec.
+  destruct (sig_dec (fun x => P (inl x)) (fun x => P_dec (inl x))).
+  - left.
+    destruct e as [x Hx].
+    now exists (inl x).
+  - destruct (sig_dec (fun y => P (inr y)) (fun y => P_dec (inr y))).
+    + left.
+      destruct e as [y Hy].
+      now exists (inr y).
+    + right; intros [[x|y] Hs].
+      * apply n; now exists x.
+      * apply n0; now exists y.
+Defined.
+
+Global Instance Empty_set_Exhaustible :
+  Exhaustible Empty_set.
+Proof.
+  constructor.
+  intros P P_dec.
+  right; intros [[] _].
+Defined.
+
+Global Instance unit_Exhaustible :
+  Exhaustible unit.
+Proof.
+  constructor.
+  intros P P_dec.
+  destruct (P_dec tt).
+  - left; now exists tt.
+  - right; now intros [[]].
+Defined.
+*)
 
 Class Dec (P : Prop) := {
   dec : {P} + {~P}
@@ -91,7 +129,7 @@ Proof.
   constructor.
   destruct (dec (P := P)); [tauto|].
   destruct (dec (P := Q)); tauto.
-Qed.
+Defined.
 
 #[export]
 Instance le_Dec : forall m n, Dec (m <= n).
@@ -115,6 +153,7 @@ Proof.
   intros; constructor; apply eq_dec.
 Defined.
 
+(*
 #[export]
 Instance Exhaustible_Sig_Dec {X} `{Exhaustible X} {P : X -> Prop} `{forall x, Dec (P x)}
  : Dec (exists x, P x).
@@ -123,7 +162,9 @@ Proof.
   apply sig_dec.
   intro; apply dec; auto.
 Defined.
+*)
 
+(*
 #[export]
 Instance Exhaustible_Pi_Dec {X} `{Exhaustible X} {P : X -> Prop} `{forall x, Dec (P x)}
   : Dec (forall x, P x).
@@ -139,6 +180,6 @@ Proof.
     elim HPx.
     exists x; auto.
 Defined.
-
+*)
 
 

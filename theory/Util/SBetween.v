@@ -1,6 +1,6 @@
-Require Import CoqChess.Util.Rel.
+Require Import Chess.Util.Rel.
 
-Definition sbetween : Rel 3 nat :=
+Definition sbetween : nat -> nat -> nat -> Prop :=
   fun x y z =>
       (x < y /\ y < z)
    \/ (z < y /\ y < x).
