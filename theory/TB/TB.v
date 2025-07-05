@@ -5,8 +5,9 @@ Require Import Chess.Chess.Chess.
 Require Import Chess.Util.UIP.
 Require Import Games.Util.Dec.
 Require Import Chess.TB.Material.
+Require Import Chess.TB.Symmetry.
 
-Global Instance Hash_ChessState : IntHash.IntHash ChessState.
+Global Instance Hash_ChessState : IntHash.CondIntHash KRvK.
 Proof.
 Admitted.
 
@@ -29,10 +30,12 @@ Proof.
   - discriminate.
 Qed.
 
+(*
 Global Instance SymChess : Symmetry ChessGame.
 Proof.
-
+  exact SymChess.
 Admitted.
+*)
 
 Global Instance DiscPiece : Discrete Piece.
 Proof.
@@ -124,6 +127,7 @@ Defined.
 
 Global Instance KRvK_bisim_closed :
   Closed.Bisim_closed auto KRvK.
+Proof.
 Admitted.
 
 Definition certified_Chess_TB : OCamlTablebase ChessGame :=

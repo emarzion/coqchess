@@ -217,8 +217,6 @@ Qed.
 
 Definition board_count (s : ChessState) (p : Player * Piece) : nat := list_count p (all_pieces s).
 
-Print Mat.
-
 Lemma Mat_to_list_S {m n} {X} (mat : Mat X (S m) n) :
   Mat.to_list mat =
   Vec.to_list (fst mat) ++ Mat.to_list (snd mat).

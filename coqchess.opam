@@ -27,5 +27,5 @@ authors: [
 
 pin-depends: [
   ["games.dev" "git+https://github.com/emarzion/games.git#34923d2e23d72365fb7fb1b00725881431aea165"]
-  ["coqtbgen.dev" "git+https://github.com/emarzion/coqtbgen.git#7d68523784473043d526cf2cf09909f7ef489cb8"]
+  ["coqtbgen.dev" "git+https://github.com/emarzion/coqtbgen.git#edb33b946710d48a05989cf73b37a9df784dc6d0"]
 ]

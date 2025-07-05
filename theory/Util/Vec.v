@@ -84,3 +84,39 @@ Fixpoint vmap {X Y} (f : X -> Y) {n} : Vec X n -> Vec Y n :=
   | 0 => fun _ => tt
   | S m => fun v => (f (fst v), vmap f (snd v))
   end.
+
+Lemma vmap_vmap {X Y Z} {n} (f : X -> Y) (g : Y -> Z) (v : Vec X n) :
+  vmap g (vmap f v) = vmap (fun x => g (f x)) v.
+Proof.
+  induction n.
+  - reflexivity.
+  - simpl; now rewrite IHn.
+Qed.
+
+Lemma vmap_ext {X Y} {n} (f g : X -> Y) (v : Vec X n) :
+  (forall x, f x = g x) ->
+  vmap f v = vmap g v.
+Proof.
+  induction n; intro Hfg.
+  - reflexivity.
+  - simpl; rewrite Hfg.
+    now rewrite IHn.
+Qed.
+
+Lemma vmap_id {X} {n} (v : Vec X n) :
+  vmap (fun x => x) v = v.
+Proof.
+  induction n.
+  - simpl; now destruct v.
+  - destruct v as [x v'].
+    simpl; now rewrite IHn.
+Qed.
+
+Fixpoint vzip {X Y Z} (f : X -> Y -> Z) {n} : Vec X n -> Vec Y n -> Vec Z n :=
+  match n with
+  | 0 => fun _ _ => tt
+  | S m => fun v w =>
+    match v, w with
+    | (x,v'), (y,w') => (f x y, vzip f v' w')
+    end
+  end.
