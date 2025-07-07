@@ -47,20 +47,12 @@ Defined.
 
 Global Instance DiscFile : Discrete File.
 Proof.
-  constructor.
-  intros [i] [i'].
-  destruct (eq_dec i i').
-  - left; congruence.
-  - right; congruence.
+  apply Fin.Fin_Discrete.
 Defined.
 
 Global Instance DiscRank : Discrete Rank.
 Proof.
-  constructor.
-  intros [i] [i'].
-  destruct (eq_dec i i').
-  - left; congruence.
-  - right; congruence.
+  apply Fin.Fin_Discrete.
 Defined.
 
 Global Instance DiscPreMove :
@@ -133,4 +125,6 @@ Admitted.
 Definition certified_Chess_TB : OCamlTablebase ChessGame :=
   certified_TB.
 
+(*
 Print Assumptions certified_Chess_TB.
+*)

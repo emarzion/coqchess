@@ -112,16 +112,16 @@ Proof.
 Qed.
 
 Lemma mat_ext {X} {m n} (M M' : Mat X m n) :
-  (forall i j, maccess i j M = maccess i j M') -> M = M'.
+  (forall c, maccess c M = maccess c M') -> M = M'.
 Proof.
   intro pf.
   apply vec_ext; intro i.
   apply vec_ext; intro j.
-  apply pf.
+  apply (pf (i,j)).
 Qed.
 
 Lemma maccess_transpose {X} {m n} (M : Mat X m n) i j :
-  maccess i j (transpose M) = maccess j i M.
+  maccess (i, j) (transpose M) = maccess (j, i) M.
 Proof.
   unfold maccess.
   induction m.
@@ -131,47 +131,119 @@ Proof.
     rewrite vaccess_vzip.
     destruct j as [[]|j'].
     + reflexivity.
-    + simpl; rewrite IHm; auto.
+    + simpl in *; rewrite IHm; auto.
 Qed.
 
-Fixpoint last {n} : Fin.Fin (S n) :=
-  match n with
-  | 0 => inl tt
-  | S m => inr last
-  end.
-
-Fixpoint front {n} : Fin.Fin n -> Fin.Fin (S n) :=
-  match n with
-  | 0 => fun e =>
-    match e with
-    end
-  | S m => fun i =>
-    match i with
-    | inl _ => inl tt
-    | inr j => inr (front j)
-    end
-  end.
-
-Fixpoint last_or_front {n} (i : Fin.Fin (S n)) :
-  { i = last } + { exists j, i = front j }.
+Lemma vaccess_last {X} {n} (v : Vec X (S n)) :
+  vaccess Fin.last v = last v.
 Proof.
   induction n.
-  - left.
-    destruct i as [[]|[]].
+  - reflexivity.
+  - simpl Fin.last.
+    destruct v as [x v'].
+    simpl last.
+    rewrite <- IHn.
     reflexivity.
+Qed.
+
+Lemma last_place_last {X} {n} (v : Vec X n) (x : X) :
+  last (place_last x v) = x.
+Proof.
+  induction n.
+  - reflexivity.
+  - simpl.
+    rewrite IHn; auto.
+Qed.
+
+Lemma last_rev {X} {n} (v : Vec X (S n)) :
+  last (rev v) = fst v.
+Proof.
+  destruct v as [x v].
+  rewrite rev_cons.
+  rewrite last_place_last; auto.
+Qed.
+
+Lemma vaccess_inr {X} {n} i (v : Vec X (S n)) :
+  vaccess (inr i : Fin.Fin (S n)) v = vaccess i (snd v).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma vaccess_front {X} {n} i (v : Vec X (S n)) :
+  vaccess (Fin.front i) v = vaccess i (front v).
+Proof.
+  induction n.
+  - destruct i.
+  - destruct v as [x v].
+    destruct i as [|j].
+    + reflexivity.
+    + destruct n.
+      * destruct j.
+      * rewrite Fin.front_inr.
+        do 2 rewrite vaccess_inr.
+        rewrite IHn.
+        reflexivity.
+Qed.
+
+Lemma front_place_last {X} {n} (v : Vec X n) x :
+  front (place_last x v) = v.
+Proof.
+  induction n.
+  - apply unit_eq.
+  - destruct v as [y v].
+    simpl; rewrite IHn; auto.
+Qed.
+
+Lemma front_rev {X} {n} (v : Vec X (S n)) :
+  front (rev v) = rev (snd v).
+Proof.
+  destruct v as [x v].
+  rewrite rev_cons.
+  rewrite front_place_last.
+  reflexivity.
+Qed.
+
+Lemma vaccess_rev {X} {n} (v : Vec X n) (i : Fin.Fin n) :
+  vaccess (Fin.Fin_rev i) (rev v) = vaccess i v.
+Proof.
+  induction n.
+  - destruct i.
   - destruct i as [[]|j].
-    + right.
-      exists (inl tt).
+    + rewrite Fin.Fin_rev_inl.
+      rewrite vaccess_last.
+      rewrite last_rev; auto.
+    + rewrite Fin.Fin_rev_inr.
+      rewrite vaccess_front.
+      rewrite front_rev.
+      rewrite IHn.
       reflexivity.
-    + destruct (IHn j) as [pf|pf].
-      * left; rewrite pf; auto.
-      * right; destruct pf as [k Hk].
-        exists (inr k).
-        rewrite Hk; auto.
-Defined.
+Qed.
+
+Lemma vaccess_Fin_rev {X} {n} (v : Vec X n) (i : Fin.Fin n) :
+  vaccess (Fin.Fin_rev i) v = vaccess i (rev v).
+Proof.
+  rewrite <- (rev_rev v) at 1.
+  apply vaccess_rev.
+Qed.
+
+Lemma maccess_hreflect {X} {m n} (M : Mat X m n) i j :
+  maccess (Fin.Fin_rev i, j) (hreflect M) = maccess (i, j) M.
+Proof.
+  unfold hreflect, maccess; simpl.
+  rewrite vaccess_rev; auto.
+Qed.
+
+Lemma maccess_vreflect {X} {m n} (M : Mat X m n) i j :
+  maccess (i, Fin.Fin_rev j) (vreflect M) = maccess (i, j) M.
+Proof.
+  unfold vreflect, maccess; simpl.
+  rewrite vaccess_Fin_rev.
+  rewrite vaccess_vmap.
+  rewrite rev_rev; auto.
+Qed.
 
 Lemma vaccess_last_place_last {X} {n} (x : X) (v : Vec X n) :
-  vaccess last (place_last x v) = x.
+  vaccess Fin.last (place_last x v) = x.
 Proof.
   induction n.
   - reflexivity.
@@ -182,7 +254,7 @@ Proof.
 Qed.
 
 Lemma vaccess_front_place_last {X} {n} (x : X) (v : Vec X n)
-  (i : Fin.Fin n) : vaccess (front i) (place_last x v) =
+  (i : Fin.Fin n) : vaccess (Fin.front i) (place_last x v) =
   vaccess i v.
 Proof.
   induction n.
@@ -198,11 +270,12 @@ Lemma transpose_place_last {X} {m} {n} (M : Mat X m n) (c : Vec X n) :
   vzip place_last c (transpose M).
 Proof.
   apply mat_ext.
-  intros i j.
+  intros [i j].
   rewrite maccess_transpose.
   unfold maccess.
   rewrite vaccess_vzip.
-  destruct (last_or_front j) as [pf|[k pf]]; subst.
+  destruct (Fin.last_or_front j) as [pf|[k pf]];
+    subst; simpl fst; simpl snd.
   - do 2 rewrite vaccess_last_place_last.
     reflexivity.
   - do 2 rewrite vaccess_front_place_last.
@@ -327,7 +400,7 @@ Proof.
   destruct a, b; simpl; d8_norm; reflexivity.
 Qed.
 
-Definition d8_mat_action {X} {n} : GroupAction d8_group (Mat X n n) := {|
+Global Instance d8_mat_action {X} {n} : GroupAction d8_group (Mat X n n) := {|
   act := mat_act;
   act_id := mat_act_id;
   act_assoc := mat_act_assoc;

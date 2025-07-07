@@ -47,35 +47,32 @@ Definition Board : Type :=
 Definition blank_board : Board :=
   mreplicate None.
 
-Inductive Rank : Type :=
-  | MkRank : Fin 8 -> Rank.
+Definition Rank : Type :=
+  Fin 8.
 
 Definition rank_1 : Rank :=
-  MkRank (Fin_of_nat 0).
+  Fin_of_nat 0.
 
 Definition rank_2 : Rank :=
-  MkRank (Fin_of_nat 1).
+  Fin_of_nat 1.
 
 Definition rank_3 : Rank :=
-  MkRank (Fin_of_nat 2).
+  Fin_of_nat 2.
 
 Definition rank_4 : Rank :=
-  MkRank (Fin_of_nat 3).
+  Fin_of_nat 3.
 
 Definition rank_5 : Rank :=
-  MkRank (Fin_of_nat 4).
+  Fin_of_nat 4.
 
 Definition rank_6 : Rank :=
-  MkRank (Fin_of_nat 5).
+  Fin_of_nat 5.
 
 Definition rank_7 : Rank :=
-  MkRank (Fin_of_nat 6).
+  Fin_of_nat 6.
 
 Definition rank_8 : Rank :=
-  MkRank (Fin_of_nat 7).
-
-Definition fin_of_rank : Rank -> Fin 8 :=
-  fun '(MkRank i) => i.
+  Fin_of_nat 7.
 
 Global Instance Fin_Discrete {n} :
   Discrete (Fin n).
@@ -94,74 +91,32 @@ Proof.
       * right; congruence.
 Defined.
 
-Global Instance Rank_Discrete : Discrete Rank.
-Proof.
-  constructor.
-  unfold decision; decide equality.
-  apply eq_dec.
-Defined.
-
-Global Instance Rank_Exhaustible : Exhaustible Rank.
-Proof.
-  constructor.
-  intros P Pd.
-  destruct (sig_dec (fun i => P (MkRank i))).
-  - intro; apply Pd.
-  - left; destruct e as [i Hi].
-    exists (MkRank i); exact Hi.
-  - right; intros [[i] Hi].
-    apply n; exists i; exact Hi.
-Defined.
-
-Inductive File : Type :=
-  | MkFile : Fin 8 -> File.
+Definition File : Type :=
+  Fin 8.
 
 Definition file_a : File :=
-  MkFile (Fin_of_nat 0).
+  Fin_of_nat 0.
 
 Definition file_b : File :=
-  MkFile (Fin_of_nat 1).
+  Fin_of_nat 1.
 
 Definition file_c : File :=
-  MkFile (Fin_of_nat 2).
+  Fin_of_nat 2.
 
 Definition file_d : File :=
-  MkFile (Fin_of_nat 3).
+  Fin_of_nat 3.
 
 Definition file_e : File :=
-  MkFile (Fin_of_nat 4).
+  Fin_of_nat 4.
 
 Definition file_f : File :=
-  MkFile (Fin_of_nat 5).
+  Fin_of_nat 5.
 
 Definition file_g : File :=
-  MkFile (Fin_of_nat 6).
+  Fin_of_nat 6.
 
 Definition file_h : File :=
-  MkFile (Fin_of_nat 7).
-
-Definition fin_of_file : File -> Fin 8 :=
-  fun '(MkFile i) => i.
-
-#[export]
-Instance File_Discrete : Discrete File.
-Proof.
-  constructor.
-  unfold decision; decide equality; apply dec.
-Defined.
-
-#[export]
-Instance File_Exhaustible : Exhaustible File.
-Proof.
-  constructor.
-  intros P Pd.
-  destruct (sig_dec (fun i => P (MkFile i))).
-  - intro; apply Pd.
-  - left; destruct e as [i Hi].
-    exists (MkFile i); exact Hi.
-  - right; intros [[i] Hi].
-    apply n; exists i; exact Hi.
-Defined.
+  Fin_of_nat 7.
 
 Definition Pos : Type :=
   File * Rank.
@@ -172,25 +127,20 @@ Definition file : Pos -> File :=
 Definition rank : Pos -> Rank :=
   snd.
 
-Definition lookup_piece : Pos -> Board -> option (Player * Piece) :=
-  fun '(MkFile i, MkRank j) b =>
-    maccess i j b.
+Definition lookup_piece : Pos -> Board -> option (Player * Piece) := maccess.
 
 Definition place_piece : Player -> Piece -> Pos
   -> Board -> Board :=
-  fun pl pc '(MkFile i, MkRank j) b =>
-    mupdate i j (Some (pl, pc)) b.
+  fun pl pc c b => mupdate c (Some (pl, pc)) b.
 
 Definition clear : Pos -> Board -> Board :=
-  fun '(MkFile i, MkRank j) b =>
-    mupdate i j None b.
+  fun c b => mupdate c None b.
 
 Lemma lookup_clear_eq : forall pos b,
   lookup_piece pos (clear pos b) = None.
 Proof.
   intros.
   unfold lookup_piece, clear.
-  destruct pos as [[r] [f]].
   apply maccess_mupdate_eq.
 Qed.
 
@@ -200,10 +150,7 @@ Lemma lookup_clear_neq : forall pos1 pos2 b, pos1 <> pos2 ->
 Proof.
   intros.
   unfold lookup_piece, clear.
-  destruct pos1 as [[r1] [f1]].
-  destruct pos2 as [[r2] [f2]].
-  rewrite maccess_mupdate_neq;
-    [auto | congruence].
+  rewrite maccess_mupdate_neq; auto.
 Qed.
 
 Lemma lookup_place_eq : forall player pos b piece,
@@ -212,7 +159,6 @@ Lemma lookup_place_eq : forall player pos b piece,
 Proof.
   intros.
   unfold lookup_piece, place_piece.
-  destruct pos as [[r] [f]].
   apply maccess_mupdate_eq.
 Qed.
 
@@ -223,10 +169,7 @@ Lemma lookup_place_neq : forall player pos1 pos2 b piece,
 Proof.
   intros.
   unfold lookup_piece, place_piece.
-  destruct pos1 as [[r1] [f1]].
-  destruct pos2 as [[r2] [f2]].
-  rewrite maccess_mupdate_neq;
-    [auto | congruence].
+  rewrite maccess_mupdate_neq; auto.
 Qed.
 
 (** Rank/File Operations *)
@@ -259,11 +202,11 @@ Definition back_rank : Player -> Rank :=
     end.
 
 Definition one_up : Rank -> Rank -> Prop :=
-  fun '(MkRank i) '(MkRank j) =>
+  fun i j =>
     val j = S (val i).
 
 Definition one_down : Rank -> Rank -> Prop :=
-  fun '(MkRank i) '(MkRank j) =>
+  fun i j =>
     val i = S (val j).
 
 Definition one_move : Player -> Rank -> Rank -> Prop :=
@@ -274,11 +217,11 @@ Definition one_move : Player -> Rank -> Rank -> Prop :=
     end.
 
 Definition two_up : Rank -> Rank -> Prop :=
-  fun '(MkRank i) '(MkRank j) =>
+  fun i j =>
     val j = S (S (val i)).
 
 Definition two_down : Rank -> Rank -> Prop :=
-  fun '(MkRank i) '(MkRank j) =>
+  fun i j =>
     val i = S (S (val i)).
 
 Definition two_move : Player -> Rank -> Rank -> Prop :=
@@ -289,52 +232,46 @@ Definition two_move : Player -> Rank -> Rank -> Prop :=
     end.
 
 Definition rank_dist : Rank -> Rank -> nat :=
-  fun '(MkRank i) '(MkRank j) =>
+  fun i j =>
     fin_dist i j.
 
 Lemma rank_dist_sym : forall r1 r2 : Rank,
   rank_dist r1 r2 = rank_dist r2 r1.
 Proof.
-  intros [i] [j].
+  intros i j.
   apply fin_dist_sym.
 Qed.
 
 Definition rank_sbetween : Rank -> Rank -> Rank -> Prop :=
   fun r1 r2 r3 =>
-    fin_sbetween
-      (fin_of_rank r1)
-      (fin_of_rank r2)
-      (fin_of_rank r3).
+    fin_sbetween r1 r2 r3.
 
 Lemma rank_sbetween_sym : forall r1 r2 r3 : Rank,
   rank_sbetween r1 r2 r3 -> rank_sbetween r3 r2 r1.
 Proof.
-  intros [i] [j] [k]; unfold rank_sbetween;
+  intros i j k; unfold rank_sbetween;
   apply fin_sbetween_sym.
 Qed.
 
 Definition file_dist : File -> File -> nat :=
-  fun '(MkFile i) '(MkFile j) =>
+  fun i j =>
     fin_dist i j.
 
 Lemma file_dist_sym : forall f1 f2 : File,
   file_dist f1 f2 = file_dist f2 f1.
 Proof.
-  intros [i] [j].
+  intros i j.
   apply fin_dist_sym.
 Qed.
 
 Definition file_sbetween : File -> File -> File -> Prop :=
   fun f1 f2 f3 =>
-    fin_sbetween
-      (fin_of_file f1)
-      (fin_of_file f2)
-      (fin_of_file f3).
+    fin_sbetween f1 f2 f3.
 
 Lemma file_sbetween_sym : forall f1 f2 f3 : File,
   file_sbetween f1 f2 f3 -> file_sbetween f3 f2 f1.
 Proof.
-  intros [i] [j] [k]; unfold file_sbetween;
+  intros i j k; unfold file_sbetween;
   apply fin_sbetween_sym.
 Qed.
 
@@ -779,25 +716,21 @@ Proof.
 Qed.
 
 Definition all_rank : list Rank :=
-  List.map MkRank (all_fin 8).
+  all_fin 8.
 
 Lemma all_rank_In : forall r : Rank,
   List.In r all_rank.
 Proof.
-  intros [i].
-  apply List.in_map.
-  apply all_fin_In.
+  intro; apply all_fin_In.
 Qed.
 
 Definition all_file : list File :=
-  List.map MkFile (all_fin 8).
+  all_fin 8.
 
 Lemma all_file_In : forall f : File,
   List.In f all_file.
 Proof.
-  intros [i].
-  apply List.in_map.
-  apply all_fin_In.
+  intro; apply all_fin_In.
 Qed.
 
 Definition all_pos : list Pos :=

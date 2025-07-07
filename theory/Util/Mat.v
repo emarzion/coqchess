@@ -11,58 +11,42 @@ Definition Mat (X : Type) (m n : nat) : Type :=
 Definition mreplicate {X} {m n} (x : X) : Mat X m n :=
   vreplicate (vreplicate x).
 
-Definition maccess {X} {m n} : Fin m -> Fin n
-  -> Mat X m n -> X :=
-  fun i j mat => vaccess j (vaccess i mat).
+Definition Coord m n : Type :=
+  Fin m * Fin n.
 
-Definition mupdate {X} {m n} : Fin m -> Fin n
-  -> X -> Mat X m n -> Mat X m n :=
-  fun i j x mat => vupdate i
-    (vupdate j x (vaccess i mat)) mat.
+Definition maccess {X} {m n} : Coord m n -> Mat X m n -> X :=
+  fun c mat => vaccess (snd c) (vaccess (fst c) mat).
+
+Definition mupdate {X} {m n} : Coord m n -> X ->
+  Mat X m n -> Mat X m n :=
+  fun c x mat => vupdate (fst c)
+    (vupdate (snd c) x (vaccess (fst c) mat)) mat.
 
 Lemma maccess_mupdate_eq {X} {m n} :
-  forall (i : Fin m) (j : Fin n) (mat : Mat X m n) (x : X),
-  maccess i j (mupdate i j x mat) = x.
+  forall (c : Coord m n) (mat : Mat X m n) (x : X),
+  maccess c (mupdate c x mat) = x.
 Proof.
   unfold maccess, mupdate.
   intros.
   repeat rewrite vaccess_vupdate_eq; reflexivity.
 Qed.
 
-Lemma maccess_mupdate_neq1 {X} {m n} :
-  forall (i1 i2 : Fin m) (j1 j2 : Fin n) (mat : Mat X m n) (x : X),
-  i1 <> i2 ->
-  maccess i1 j1 (mupdate i2 j2 x mat) =
-  maccess i1 j1 mat.
-Proof.
-  unfold maccess, mupdate.
-  intros.
-  rewrite vaccess_vupdate_neq; auto.
-Qed.
-
-Lemma maccess_mupdate_neq2 {X} {m n} :
-  forall (i : Fin m) (j1 j2 : Fin n) (mat : Mat X m n) (x : X),
-  j1 <> j2 ->
-  maccess i j1 (mupdate i j2 x mat) =
-  maccess i j1 mat.
-Proof.
-  unfold maccess, mupdate.
-  intros.
-  rewrite vaccess_vupdate_eq.
-  apply vaccess_vupdate_neq; auto.
-Qed.
-
 Lemma maccess_mupdate_neq {X} {m n} :
-  forall (i1 i2 : Fin m) (j1 j2 : Fin n) (mat : Mat X m n) (x : X),
-  (i1, j1) <> (i2, j2) ->
-  maccess i1 j1 (mupdate i2 j2 x mat) =
-  maccess i1 j1 mat.
+  forall (c1 c2 : Coord m n) (mat : Mat X m n) (x : X),
+  c1 <> c2 ->
+  maccess c1 (mupdate c2 x mat) =
+  maccess c1 mat.
 Proof.
-  intros.
-  destruct (Dec.eq_dec i1 i2).
-  - rewrite e.
-    rewrite maccess_mupdate_neq2; congruence.
-  - rewrite maccess_mupdate_neq1; auto.
+  unfold maccess, mupdate.
+  intros c1 c2 mat x Hneq.
+  destruct (Dec.eq_dec (fst c1) (fst c2)) as [eq1|neq1].
+  - rewrite eq1.
+    rewrite vaccess_vupdate_eq.
+    rewrite vaccess_vupdate_neq; auto.
+    intro neq2.
+    apply Hneq.
+    destruct c1,c2; simpl in *; congruence.
+  - rewrite vaccess_vupdate_neq; auto.
 Qed.
 
 Definition to_list {X} {m n} (M : Mat X m n) : list X :=

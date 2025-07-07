@@ -319,41 +319,106 @@ Defined.
 Definition get_all_above {n} (i : Fin n) : list (Fin n) :=
   get_all_above_aux i (Fin_gt_wf i).
 
-Inductive outcome : Type :=
-  | take
-  | take_and_stop
-  | do_not_take_and_stop.
+Fixpoint last {n} : Fin.Fin (S n) :=
+  match n with
+  | 0 => inl tt
+  | S m => inr last
+  end.
 
-Section Traverse.
+Fixpoint front {n} : Fin.Fin n -> Fin.Fin (S n) :=
+  match n with
+  | 0 => fun e =>
+    match e with
+    end
+  | S m => fun i =>
+    match i with
+    | inl _ => inl tt
+    | inr j => inr (front j)
+    end
+  end.
 
-Variable X : Type.
-
-Variable m : X -> X -> Prop.
-
-Hypothesis m_wf : well_founded m.
-
-Variable next : X -> option X.
-
-Hypothesis next_decr : forall x x',
-  next x = Some x' -> m x' x.
-
-Hypothesis cond : X -> outcome.
-
-Fixpoint traverse_aux (x : X) (a : Acc m x) : list X.
+Lemma front_inr {n} (i : Fin (S n)) :
+  front (inr i : Fin (S (S n))) = inr (front i).
 Proof.
-  destruct (next x) eqn:?.
-  - destruct (cond x0) eqn:?.
-    + refine (x0 :: traverse_aux x0 _).
-      destruct a.
-      apply H.
-      apply next_decr; auto.
-    + exact [x0].
-    + exact [].
-  - exact [].
+  reflexivity.
+Qed.
+
+Fixpoint last_or_front {n} (i : Fin.Fin (S n)) :
+  { i = last } + { exists j, i = front j }.
+Proof.
+  induction n.
+  - left.
+    destruct i as [[]|[]].
+    reflexivity.
+  - destruct i as [[]|j].
+    + right.
+      exists (inl tt).
+      reflexivity.
+    + destruct (IHn j) as [pf|pf].
+      * left; rewrite pf; auto.
+      * right; destruct pf as [k Hk].
+        exists (inr k).
+        rewrite Hk; auto.
 Defined.
 
-Definition traverse (x : X) : list X :=
-  traverse_aux x (m_wf x).
+Fixpoint Fin_rev {n} : Fin.Fin n -> Fin.Fin n :=
+  match n with
+  | 0 => fun i => i
+  | S m => fun i =>
+    match i with
+    | inl _ => last
+    | inr j => front (Fin_rev j)
+    end
+  end.
 
-End Traverse.
+Lemma Fin_rev_inr {n} (i : Fin n) :
+  Fin_rev (inr i : Fin (S n)) = front (Fin_rev i).
+Proof.
+  reflexivity.
+Qed.
 
+Lemma Fin_rev_last {n} :
+  Fin_rev (last : Fin (S n)) = inl tt.
+Proof.
+  induction n.
+  - reflexivity.
+  - simpl last.
+    rewrite @Fin_rev_inr.
+    rewrite IHn.
+    reflexivity.
+Qed.
+
+Lemma Fin_rev_front {n} (i : Fin n) :
+  Fin_rev (front i) = inr (Fin_rev i).
+Proof.
+  induction n.
+  - destruct i.
+  - destruct i as [[]|j].
+    + reflexivity.
+    + rewrite Fin_rev_inr.
+      destruct n.
+      * destruct j.
+      * rewrite front_inr.
+        rewrite Fin_rev_inr.
+        rewrite IHn.
+        reflexivity.
+Qed.
+
+Lemma Fin_rev_Fin_rev {n} (i : Fin.Fin n) :
+  Fin_rev (Fin_rev i) = i.
+Proof.
+  induction n.
+  - reflexivity.
+  - unfold Fin_rev at 2.
+    destruct i.
+    + destruct u; apply Fin_rev_last.
+    + rewrite Fin_rev_front.
+      rewrite IHn; auto.
+Qed.
+
+Lemma Fin_rev_inl {n} :
+  Fin_rev (inl tt : Fin (S n)) = last.
+Proof.
+  rewrite <- (Fin_rev_Fin_rev last).
+  rewrite Fin_rev_last; auto.
+Qed.
