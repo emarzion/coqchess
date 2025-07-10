@@ -440,6 +440,14 @@ Record RegularMove (st : ChessState) : Type := {
 Arguments premove {_}.
 Arguments premove_legal {_}.
 
+Lemma RegularMove_ext s : forall m m' : RegularMove s,
+  premove m = premove m' -> m = m'.
+Proof.
+  intros [m1 pf1] [m2 pf2] pf; simpl in *.
+  subst; f_equal.
+  apply UIP.
+Qed.
+
 Lemma dest_orig_neq {st} (m : RegularMove st) :
   dest (premove m) <> origin (premove m).
 Proof.
