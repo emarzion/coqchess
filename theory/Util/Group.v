@@ -17,5 +17,6 @@ Record Group : Type := {
 
 Arguments id {_}.
 Arguments mult {_} _ _.
+Arguments inv {_} _.
 
 Infix "#" := mult (at level 100).

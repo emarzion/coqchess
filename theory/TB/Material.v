@@ -365,15 +365,15 @@ Qed.
 
 Lemma list_count_mupdate {m n} {X} `{Discrete X} (x x' : X)
   (mat : Mat X m n) (i : Fin.Fin m) (j : Fin.Fin n) :
-  list_count x (Mat.to_list (mupdate i j x' mat)) =
+  list_count x (Mat.to_list (mupdate (i, j) x' mat)) =
   match eq_dec x x' with
   | left _ =>
-    match eq_dec x (maccess i j mat) with
+    match eq_dec x (maccess (i, j) mat) with
     | left _ => list_count x (Mat.to_list mat)
     | right _ => S (list_count x (Mat.to_list mat))
     end
   | right _ =>
-    match eq_dec x (maccess i j mat) with
+    match eq_dec x (maccess (i, j) mat) with
     | left _ => pred (list_count x (Mat.to_list mat))
     | right _ => list_count x (Mat.to_list mat)
     end
@@ -381,7 +381,7 @@ Lemma list_count_mupdate {m n} {X} `{Discrete X} (x x' : X)
 Proof.
   destruct (eq_dec x x') as [xx'_eq|xx'_neq].
   - subst.
-    destruct (eq_dec x' (maccess i j mat)) as [Hx'|Hx'].
+    destruct (eq_dec x' (maccess (i, j) mat)) as [Hx'|Hx'].
     + do 2 rewrite list_count_Mat_to_list.
       apply list_sum_map_all_fin.
       intro k.
@@ -409,7 +409,7 @@ Proof.
       * intros k Hk.
         unfold mupdate.
         rewrite vaccess_vupdate_neq; auto.
-  - destruct (eq_dec x (maccess i j mat)) as [Hx|Hx].
+  - destruct (eq_dec x (maccess (i, j) mat)) as [Hx|Hx].
     + subst.
       do 2 rewrite list_count_Mat_to_list.
       apply list_sum_map_all_fin_P with (i := i).
@@ -463,17 +463,17 @@ Proof.
   unfold place_piece.
   destruct premove; simpl in do_neq.
   unfold Chess.origin.
-  destruct origin as [[i] [j]].
+  destruct origin as [i j].
   unfold Chess.dest.
-  destruct dest as [[i'] [j']].
+  destruct dest as [i' j'].
   unfold Chess.piece.
   repeat rewrite list_count_filter_Some.
-  rewrite list_count_mupdate.
+  rewrite @list_count_mupdate.
   destruct eq_dec; [congruence|].
   destruct eq_dec as [pf1|pf1].
-  - rewrite list_count_mupdate.
+  - rewrite @list_count_mupdate.
     destruct eq_dec; destruct eq_dec; lia.
-  - rewrite list_count_mupdate.
+  - rewrite @list_count_mupdate.
     destruct eq_dec as [pf2|pf2].
     + destruct eq_dec as [pf3|pf3].
       * lia.
