@@ -1,3 +1,7 @@
+Require Import Lia.
+Require Import List.
+Import ListNotations.
+
 Require Import TBGen.StratSymTB.TB.
 Require Import TBGen.StratSymTB.OCamlTB.
 
@@ -545,11 +549,457 @@ Proof.
     apply act_id.
 Defined.
 
+Class Ord (X : Type) := {
+  ord_lt : X -> X -> Prop;
+  ord_lt_trans : forall x y z, ord_lt x y -> ord_lt y z -> ord_lt x z;
+  ord_lt_trich : forall x y, { ord_lt x y } + { x = y} + { ord_lt y x };
+  ord_lt_antisym : forall x y, ord_lt x y -> ~ ord_lt y x;
+  ord_lt_dec : forall x y, { ord_lt x y } + { ~ ord_lt x y };
+  }.
+
+Lemma ord_lt_irref {X} `{Ord X} : forall x,
+ ~ ord_lt x x.
+Proof.
+  intros x pf.
+  apply (ord_lt_antisym x x); auto.
+Qed.
+
+Definition ord_le {X} `{Ord X} : X -> X -> Prop :=
+  fun x y => x = y \/ ord_lt x y.
+
+Lemma ord_le_trans {X} `{Ord X} : forall x y z,
+  ord_le x y -> ord_le y z -> ord_le x z.
+Proof.
+  intros x y z [pf1|pf1] pf2.
+  - subst; auto.
+  - destruct pf2 as [pf2|pf2].
+    + subst; right; auto.
+    + right; apply ord_lt_trans with (y := y); auto.
+Qed.
+
+Lemma ord_le_antisym {X} `{Ord X} : forall x y,
+  ord_le x y -> ord_le y x -> x = y.
+Proof.
+  intros x y [|] [|]; auto.
+  exfalso.
+  apply (ord_lt_antisym x y); auto.
+Qed.
+
+Instance Ord_Player : Ord Player.Player.
+Proof.
+  unshelve econstructor.
+  - exact (fun p1 p2 => p1 = Player.Black /\ p2 = Player.White).
+  - intros x y z; simpl; tauto.
+  - intros x y; simpl.
+    destruct x; destruct y; tauto.
+  - simpl; intros x y [] []; congruence.
+  - simpl; intros x y.
+    destruct x.
+    + right; intros []; congruence.
+    + destruct y.
+      * left; auto.
+      * right; intros []; congruence.
+Defined.
+
+Instance Lex_Ord {X Y} `{Ord X, Ord Y} : Ord (X * Y).
+Proof.
+  unshelve econstructor.
+  - exact (fun p p' =>
+      ord_lt (fst p) (fst p') \/ (
+      fst p = fst p' /\
+      ord_lt (snd p) (snd p'))).
+  - intros [x1 y1] [x2 y2] [x3 y3]; simpl.
+    intros [|[]] [|[]].
+    + left; eapply ord_lt_trans; eauto.
+    + subst; now left.
+    + subst; now left.
+    + subst; right; split; auto.
+      eapply ord_lt_trans; eauto.
+  - intros [x1 y1] [x2 y2]; simpl.
+    destruct (ord_lt_trich x1 x2) as [[|]|].
+    + now left; left; left.
+    + destruct (ord_lt_trich y1 y2) as [[|]|].
+      * now left; left; right.
+      * left; right; congruence.
+      * right; right; split; auto.
+    + now right; left.
+  - intros [x1 y1] [x2 y2]; simpl.
+    intros [|[]] [|[]].
+    + eapply (ord_lt_antisym x1); eauto.
+    + subst; apply (ord_lt_irref x1); auto.
+    + subst; apply (ord_lt_irref x2); auto.
+    + eapply (ord_lt_antisym y1); eauto.
+  - intros [x1 y1] [x2 y2]; simpl.
+    destruct (ord_lt_trich x1 x2) as [[|]|].
+    + left; left; auto.
+    + destruct (ord_lt_dec y1 y2).
+      * now left; right.
+      * right; intros [|[]]; auto.
+        subst; apply (ord_lt_irref x2); auto.
+    + right; intros [|[]].
+      * eapply (ord_lt_antisym x1); eauto.
+      * subst; apply (ord_lt_irref x2); auto.
+Defined.
+
+Instance Fin_Ord {n} : Ord (Fin.Fin n).
+Proof.
+  unshelve econstructor.
+  - exact (fun i j => Fin.val i < Fin.val j).
+  - simpl; intros; lia.
+  - intros x y.
+    destruct (Compare_dec.lt_eq_lt_dec
+      (Fin.val x) (Fin.val y)) as [[|]|].
+    + now left; left.
+    + left; right.
+      apply Fin.val_inj; auto.
+    + now right.
+  - simpl; lia.
+  - intros; apply Compare_dec.lt_dec.
+Defined.
+
+Instance unit_Ord : Ord unit.
+Proof.
+  unshelve econstructor.
+  - exact (fun _ _ => False).
+  - simpl; auto.
+  - simpl; intros [] []; auto.
+  - simpl; auto.
+  - simpl; auto.
+Defined.
+
+Instance Vec_Ord {n} {X} `{Ord X} : Ord (Vec.Vec X n).
+Proof.
+  induction n.
+  - exact unit_Ord.
+  - apply Lex_Ord.
+Defined.
+
+Instance option_Ord {X} `{Ord X} : Ord (option X).
+Proof.
+  unshelve econstructor.
+  - exact (fun o1 o2 =>
+      match o1, o2 with
+      | None, None => False
+      | None, Some _ => True
+      | Some _, None => False
+      | Some x1, Some x2 => ord_lt x1 x2
+      end).
+  - simpl; intros x y z pf1 pf2.
+    destruct x as [x|].
+    + destruct y as [y|]; [|tauto].
+      destruct z as [z|]; auto.
+      eapply ord_lt_trans; eauto.
+    + destruct y as [y|]; [|tauto].
+      destruct z; tauto.
+  - simpl; intros [x|] [y|].
+    + destruct (ord_lt_trich x y) as [[|]|].
+      * now left; left.
+      * left; right; congruence.
+      * now right.
+    + now right.
+    + now left; left.
+    + now left; right.
+  - simpl; intros [x|] [y|]; try tauto.
+    apply ord_lt_antisym.
+  - simpl; intros [x|] [y|]; try tauto.
+    apply ord_lt_dec.
+Defined.
+
+Definition Piece_val (p : Piece) : nat :=
+  match p with
+  | King => 0
+  | Queen => 1
+  | Rook => 2
+  | Bishop => 3
+  | Knight => 4
+  end.
+
+Lemma Piece_val_inj : forall p p', Piece_val p = Piece_val p' -> p = p'.
+Proof.
+  intros [] []; simpl; auto; discriminate.
+Qed.
+
+Instance Piece_Ord : Ord Piece.
+Proof.
+  unshelve econstructor.
+  - exact (fun p p' => Piece_val p < Piece_val p').
+  - simpl; intros; lia.
+  - intros x y.
+    destruct (Compare_dec.lt_eq_lt_dec
+      (Piece_val x) (Piece_val y)) as [[|]|].
+    + now left; left.
+    + left; right.
+      apply Piece_val_inj; auto.
+    + now right.
+  - simpl; lia.
+  - intros; apply Compare_dec.lt_dec.
+Defined.
+
+Definition ChessState_ord_lt (s1 s2 : ChessState) : Prop :=
+  ord_lt (white_king s1) (white_king s2) \/ (
+  white_king s1 = white_king s2 /\ (
+  ord_lt (black_king s1) (black_king s2) \/ (
+  black_king s1 = black_king s2 /\ (
+  ord_lt (board s1) (board s2) \/ (
+  board s1 = board s2 /\
+  ord_lt (chess_to_play s1) (chess_to_play s2)
+  ))))).
+
+Fixpoint min_aux {X} `{Ord X} (xs : list X) (def : X) {struct xs} : X :=
+  match xs with
+  | [] => def
+  | x :: xs' =>
+    match ord_lt_trich x def with
+    | inleft _ => min_aux xs' x
+    | inright _ => min_aux xs' def
+    end
+  end.
+
+Lemma In_min_aux {X} `{Ord X} xs : forall x,
+  {In (min_aux xs x) xs} + {min_aux xs x = x}.
+Proof.
+  induction xs as [|y ys]; intro.
+  - now right.
+  - simpl.
+    destruct ord_lt_trich as [[|]|].
+    + destruct (IHys y).
+      * left; now right.
+      * left; now left.
+    + subst.
+      destruct (IHys x).
+      * left; now right.
+      * left; now left.
+    + destruct (IHys x).
+      * left; now right.
+      * now right.
+Qed.
+
+Lemma min_aux_le_def {X} `{Ord X} (xs : list X) : forall def,
+  ord_le (min_aux xs def) def.
+Proof.
+  induction xs as [|y ys]; intro.
+  - left; auto.
+  - simpl.
+    destruct ord_lt_trich.
+    + apply ord_le_trans with (y := y); auto.
+      destruct s; [now right|now left].
+    + apply IHys.
+Qed.
+
+Lemma In_min_aux_le {X} `{Ord X} (xs : list X) : forall (def : X) (x : X),
+  In x xs -> ord_le (min_aux xs def) x.
+Proof.
+  induction xs as [|y ys]; intros def x pf.
+  - destruct pf.
+  - destruct pf; simpl; subst.
+    + destruct ord_lt_trich.
+      * apply min_aux_le_def.
+      * apply ord_le_trans with (y := def).
+        -- apply min_aux_le_def.
+        -- now right.
+    + destruct ord_lt_trich; apply IHys; auto.
+Qed.
+
+Definition enum_d8 : list d8_group :=
+  [i; r90; r180; r270; h; v; d; ad].
+
+Lemma enum_d8_all : forall x,
+  In x enum_d8.
+Proof.
+  destruct x; simpl; firstorder.
+Qed.
+
+Global Instance ChessState_Ord : Ord ChessState.
+Proof.
+  unshelve econstructor.
+  - exact ChessState_ord_lt.
+  - intros x y z pf1 pf2.
+    unfold ChessState_ord_lt in *.
+    destruct pf1 as [pf1|[pf1 pf3]].
+    + destruct pf2 as [pf2|[pf2 pf3]].
+      * left; eapply ord_lt_trans; eauto.
+      * left; congruence.
+    + rewrite pf1.
+      destruct pf2 as [pf4|[pf4 pf5]].
+      * left; auto.
+      * right; split; auto.
+        clear pf1 pf4.
+        destruct pf3 as [pf6|[pf6 pf7]].
+        -- destruct pf5 as [pf7|[pf7 pf8]].
+           ++ left; eapply ord_lt_trans; eauto.
+           ++ left; congruence.
+        -- rewrite pf6.
+           destruct pf5 as [pf8|[pf8 pf9]].
+           ++ left; auto.
+           ++ right; split; auto.
+              clear pf6 pf8.
+              destruct pf7 as [pf10|[pf10 pf11]].
+              ** destruct pf9 as [pf11|[pf11 pf12]].
+                 --- left; eapply ord_lt_trans; eauto.
+                 --- left; congruence.
+              ** rewrite pf10.
+                 destruct pf9 as [pf12|[pf12 pf13]].
+                 --- left; auto.
+                 --- right; split; auto.
+                     eapply ord_lt_trans; eauto.
+  - intros x y.
+    unfold ChessState_ord_lt.
+    destruct (ord_lt_trich (white_king x) (white_king y)) as [[pf1|pf1]|pf1].
+    + left; left; left; auto.
+    + destruct (ord_lt_trich (black_king x) (black_king y)) as [[pf2|pf2]|pf2].
+      * left; left; right; split; auto.
+      * destruct (ord_lt_trich (board x) (board y)) as [[pf3|pf3]|pf3].
+        -- left; left; right; split; auto.
+        -- destruct (ord_lt_trich (chess_to_play x) (chess_to_play y)) as [[pf4|pf4]|pf4].
+           ++ left; left; right; split; auto.
+           ++ left; right.
+              apply state_ext; auto.
+           ++ right; right; split; auto.
+        -- right; right; split; auto.
+      * right; right; split; auto.
+    + right; left; auto.
+  - intros x y pf1 pf2.
+    unfold ChessState_ord_lt in *.
+    destruct pf1 as [pf1|[pf1 pf3]].
+    + destruct pf2 as [pf2|[pf2 pf4]].
+      * eapply ord_lt_antisym with (x := white_king x); eauto.
+      * rewrite pf2 in pf1.
+        apply (ord_lt_irref (white_king x)); eauto.
+    + destruct pf2 as [pf2|[pf2 pf4]].
+      * rewrite pf1 in pf2.
+        apply (ord_lt_irref (white_king y)); auto.
+      * destruct pf3 as [pf3|[pf5 pf6]].
+        -- destruct pf4 as [pf4|[pf4 pf5]].
+           ++ eapply ord_lt_antisym with (x := black_king x); eauto.
+           ++ rewrite pf4 in pf3.
+              apply (ord_lt_irref (black_king x)); auto.
+        -- destruct pf4 as [pf4|[pf4 pf7]].
+           ++ rewrite pf5 in pf4.
+              apply (ord_lt_irref (black_king y)); auto.
+           ++ destruct pf6 as [pf6|[pf8 pf9]].
+              ** destruct pf7 as [pf7|[pf7 pf8]].
+                 --- eapply ord_lt_antisym with (x := board x); eauto.
+                 --- rewrite pf7 in pf6.
+                     apply (ord_lt_irref (board x)); auto.
+              ** destruct pf7 as [pf7|[pf10 pf11]].
+                 --- rewrite pf8 in pf7.
+                     apply (ord_lt_irref (board y)); auto.
+                 --- eapply ord_lt_antisym with
+                       (x := chess_to_play x); eauto.
+  - intros x y.
+    unfold ChessState_ord_lt.
+    destruct (ord_lt_trich (white_king x) (white_king y))
+      as [[pf1|pf1]|pf1].
+    + left; left; auto.
+    + destruct (ord_lt_trich (black_king x) (black_king y)) as [[pf2|pf2]|pf2].
+      * left; right; split; auto.
+      * destruct (ord_lt_trich (board x) (board y)) as [[pf3|pf3]|pf3].
+        -- left; right; split; auto.
+        -- destruct (ord_lt_dec (chess_to_play x) (chess_to_play y)).
+           ++ left; right; split; auto.
+           ++ right; intros [pf4|[pf4 pf5]].
+              ** rewrite pf1 in pf4.
+                 apply (ord_lt_irref (white_king y)); auto.
+              ** destruct pf5 as [pf5|[pf5 pf6]].
+                 --- rewrite pf2 in pf5.
+                     apply (ord_lt_irref (black_king y)); auto.
+                 --- destruct pf6 as [pf6|[pf7 pf8]]; auto.
+                     rewrite pf3 in pf6.
+                     apply (ord_lt_irref (board y)); auto.
+        -- right; intros [pf4|[pf4 pf5]].
+           ++ rewrite pf1 in pf4.
+              apply (ord_lt_irref (white_king y)); auto.
+           ++ destruct pf5 as [pf5|[pf5 pf6]].
+              ** rewrite pf2 in pf5.
+                 eapply (ord_lt_irref (black_king y)); auto.
+              ** destruct pf6 as [pf6|[pf6 pf7]].
+                 --- eapply ord_lt_antisym with (x := board x); eauto.
+                 --- rewrite pf6 in pf3.
+                     apply (ord_lt_irref (board y)); eauto.
+      * right; intros [pf3|[pf3 pf4]].
+        -- rewrite pf1 in pf3.
+           apply (ord_lt_irref (white_king y)); eauto.
+        -- destruct pf4 as [pf4|[pf5 pf6]].
+           ++ eapply (ord_lt_antisym (black_king x)); eauto.
+           ++ rewrite pf5 in pf2.
+              apply (ord_lt_irref (black_king y)); auto.
+    + right; intros [pf2|[pf2 pf3]].
+      * eapply (ord_lt_antisym (white_king x)); eauto.
+      * rewrite pf2 in pf1.
+        apply (ord_lt_irref (white_king y)); auto.
+Defined.
+
+Global Instance ChessState_Disc : Discrete ChessState.
+Proof.
+  constructor.
+  intros s s'.
+  destruct (ord_lt_trich s s') as [[pf|pf]|pf].
+  - right.
+    intro; subst.
+    apply (ord_lt_irref s'); auto.
+  - now left.
+  - right.
+    intro; subst.
+    apply (ord_lt_irref s'); auto.
+Defined.
+
+Definition normalize : ChessState -> ChessState :=
+  fun s => min_aux (map (fun x => x @ s) enum_d8) s.
+
+Lemma in_map_sig {X Y} `{Discrete Y} {f : X -> Y} {xs} {y}
+  : In y (map f xs) -> {x : X & f x = y /\ In x xs}.
+Proof.
+  induction xs as [|x xs'].
+  - intros [].
+  - intro HIn.
+    destruct (eq_dec (f x) y).
+    + exists x; split; auto.
+      now left.
+    + destruct IHxs' as [x' [Hx'1 Hx'2]].
+      * destruct HIn; [contradiction|auto].
+      * exists x'; split; auto.
+        now right.
+Defined.
+
+Lemma normalize_act x s :
+  normalize (x @ s) = normalize s.
+Proof.
+  apply ord_le_antisym.
+  - apply In_min_aux_le.
+    destruct (In_min_aux (map (fun y => y @ s) enum_d8) s).
+    + rewrite in_map_iff in *.
+      destruct i as [a [Ha _]].
+      exists (a # inv x); split.
+      * rewrite act_assoc.
+        rewrite mult_assoc.
+        rewrite inv_left.
+        rewrite id_right; auto.
+      * apply enum_d8_all.
+    + rewrite in_map_iff.
+      exists (inv x); split.
+      * rewrite act_assoc.
+        rewrite inv_left.
+        rewrite act_id.
+        symmetry; exact e.
+      * apply enum_d8_all.
+  - apply In_min_aux_le.
+    destruct (In_min_aux (map (fun y => y @ (x @ s)) enum_d8) (x @ s)).
+    + rewrite in_map_iff in *.
+      destruct i as [a [Ha _]].
+      exists (a # x); split.
+      * rewrite <- act_assoc; auto.
+      * apply enum_d8_all.
+    + rewrite in_map_iff.
+      exists x; split.
+      * auto.
+      * apply enum_d8_all.
+Defined.
+
 Global Instance SymChess : Symmetry ChessGame.
 Proof.
   unshelve econstructor.
   - exact d8_InvertibleBisim.
-  - admit. (* normalize *)
+  - exact normalize.
   - intro s.
     exists id.
     apply act_id.
@@ -563,6 +1013,17 @@ Proof.
     exists (y # x).
     rewrite <- act_assoc.
     congruence.
-  - admit.
-  - admit.
-Admitted.
+  - intros s.
+    unfold normalize.
+    destruct (In_min_aux
+      (map (fun x => x @ s) enum_d8) s).
+    + apply in_map_sig in i.
+      destruct i as [x [Hx _]].
+      exists x; auto.
+    + exists i.
+      rewrite @act_id.
+      symmetry; auto.
+  - intros s s' [x Hx].
+    rewrite <- Hx.
+    rewrite normalize_act; auto.
+Defined.
