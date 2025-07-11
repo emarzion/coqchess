@@ -112,7 +112,11 @@ Defined.
 Global Instance KRvK_bisim_closed :
   Closed.Bisim_closed auto KRvK.
 Proof.
-Admitted.
+  simpl; constructor.
+  intros s s' mat [x Hx]; subst.
+  unfold KRvK.
+  rewrite get_material_act; auto.
+Qed.
 
 Definition certified_Chess_TB : OCamlTablebase ChessGame :=
   certified_TB.

@@ -13,6 +13,11 @@ Require Import Chess.Util.Mat.
 Require Import Chess.Util.Vec.
 Require Import Chess.Util.ListUtil.
 
+Require Import Chess.Util.Group.
+Require Import Chess.Util.GroupAction.
+Require Import Chess.TB.StateAction.
+Require Import Chess.TB.Symmetry.
+
 Definition all_pieces (s : ChessState) : list (Player * Piece) :=
   filter_Some (Mat.to_list (board s)).
 
@@ -132,7 +137,7 @@ Definition empty_mat : Material := {|
 Definition add_piece : Piece -> Material -> Material :=
   fun p =>
     match p with
-    | King => id
+    | King => fun x => x
     | Queen => add_queen
     | Rook => add_rook
     | Bishop => add_bishop
@@ -600,3 +605,11 @@ Proof.
   - apply Material_le_exec_move_white.
   - apply Material_le_exec_move_black.
 Qed.
+
+Lemma get_material_act x s :
+  get_material (x @ s) = get_material s.
+Proof.
+  unfold get_material.
+  unfold all_pieces.
+  rewrite board_act.
+Admitted.
