@@ -1,7 +1,5 @@
 Require Import Arith.
 Require Import Lia.
-Require Import List.
-Import ListNotations.
 
 Require Import Games.Game.Player.
 
@@ -13,590 +11,406 @@ Require Import Chess.Util.Mat.
 Require Import Chess.Util.Vec.
 Require Import Chess.Util.ListUtil.
 
-Definition all_pieces (s : ChessState) : list (Player * Piece) :=
-  filter_Some (Mat.to_list (board s)).
+Require Import Chess.Util.Group.
+Require Import Chess.Util.GroupAction.
+Require Import Chess.Util.D8.
+Require Import Chess.TB.StateAction.
+Require Import Chess.TB.Symmetry.
 
-Definition eqb {X} `{Discrete X} : X -> X -> bool :=
-  fun x x' =>
-    match eq_dec x x' with
-    | left _ => true
-    | right _ => false
-    end.
-
-Record Material : Type := {
-  queen_ct : nat;
-  rook_ct : nat;
-  bishop_ct : nat;
-  knight_ct : nat;
-  }.
-
-Definition Material_le (m1 m2 : Material) : Prop :=
-  queen_ct m1 <= queen_ct m2 /\
-  rook_ct m1 <= rook_ct m2 /\
-  bishop_ct m1 <= bishop_ct m2 /\
-  knight_ct m1 <= knight_ct m2.
-
-Definition Material_le_dec (m1 m2 : Material) :
-  { Material_le m1 m2 } + { ~ Material_le m1 m2 }.
-Proof.
-  unfold Material_le.
-  destruct (Compare_dec.le_dec (queen_ct m1) (queen_ct m2)); [|right; tauto].
-  destruct (Compare_dec.le_dec (rook_ct m1) (rook_ct m2)); [|right; tauto].
-  destruct (Compare_dec.le_dec (bishop_ct m1) (bishop_ct m2)); [|right; tauto].
-  destruct (Compare_dec.le_dec (knight_ct m1) (knight_ct m2)); [|right; tauto].
-  left; tauto.
-Defined.
-
-Record TotalMaterial : Type := {
-  white_material : Material;
-  black_material : Material;
-  }.
-
-Definition TotalMaterial_le (t1 t2 : TotalMaterial) : Prop :=
-  Material_le (white_material t1) (white_material t2) /\
-  Material_le (black_material t1) (black_material t2).
-
-Definition TotalMaterial_le_dec (t1 t2 : TotalMaterial) :
-  { TotalMaterial_le t1 t2 } + { ~ TotalMaterial_le t1 t2 }.
-Proof.
-  unfold TotalMaterial_le.
-  destruct (Material_le_dec (white_material t1) (white_material t2)); [|right; tauto].
-  destruct (Material_le_dec (black_material t1) (black_material t2)); [|right; tauto].
-  left; tauto.
-Defined.
-
-Lemma Material_le_trans (m1 m2 m3 : Material) :
-  Material_le m1 m2 ->
-  Material_le m2 m3 ->
-  Material_le m1 m3.
-Proof.
-  intros p1 p2.
-  unfold Material_le in *.
-  repeat split.
-  - apply Nat.le_trans with (m := queen_ct m2); tauto.
-  - apply Nat.le_trans with (m := rook_ct m2); tauto.
-  - apply Nat.le_trans with (m := bishop_ct m2); tauto.
-  - apply Nat.le_trans with (m := knight_ct m2); tauto.
-Qed.
-
-Lemma TotalMaterial_le_trans (t1 t2 t3 : TotalMaterial) :
-  TotalMaterial_le t1 t2 ->
-  TotalMaterial_le t2 t3 ->
-  TotalMaterial_le t1 t3.
-Proof.
-  intros [w1 b1] [w2 b2].
-  split.
-  - apply Material_le_trans with (m2 := white_material t2); auto.
-  - apply Material_le_trans with (m2 := black_material t2); auto.
-Qed.
-
-Definition add_queen : Material -> Material :=
-  fun m => {|
-    queen_ct := S (queen_ct m);
-    rook_ct := rook_ct m;
-    bishop_ct := bishop_ct m;
-    knight_ct := knight_ct m;
-  |}.
-
-Definition add_rook : Material -> Material :=
-  fun m => {|
-    queen_ct := queen_ct m;
-    rook_ct := S (rook_ct m);
-    bishop_ct := bishop_ct m;
-    knight_ct := knight_ct m;
-  |}.
-
-Definition add_bishop : Material -> Material :=
-  fun m => {|
-    queen_ct := queen_ct m;
-    rook_ct := rook_ct m;
-    bishop_ct := S (bishop_ct m);
-    knight_ct := knight_ct m;
-  |}.
-
-Definition add_knight : Material -> Material :=
-  fun m => {|
-    queen_ct := queen_ct m;
-    rook_ct := rook_ct m;
-    bishop_ct := bishop_ct m;
-    knight_ct := S (knight_ct m);
-  |}.
-
-Definition empty_mat : Material := {|
-  queen_ct := 0;
-  rook_ct := 0;
-  bishop_ct := 0;
-  knight_ct := 0
-  |}.
-
-Definition add_piece : Piece -> Material -> Material :=
-  fun p =>
-    match p with
-    | King => id
-    | Queen => add_queen
-    | Rook => add_rook
-    | Bishop => add_bishop
-    | Knight => add_knight
-    end.
-
-Fixpoint get_material_aux (ps : list (Player * Piece))
-  (w : Material) (b : Material) : TotalMaterial :=
-  match ps with
-  | [] => {| white_material := w; black_material := b; |}
-  | (White, p) :: tl => get_material_aux tl (add_piece p w) b
-  | (Black, p) :: tl => get_material_aux tl w (add_piece p b)
+Fixpoint Vec_count {X} `{Discrete X} {n} (x : X) : Vec X n -> nat :=
+  match n with
+  | 0 => fun _ => 0
+  | S m => fun v =>
+    match eq_dec x (fst v) with
+    | left _ => S (Vec_count x (snd v))
+    | right _ => Vec_count x (snd v)
+    end
   end.
 
-Definition get_material (s : ChessState) : TotalMaterial :=
-  get_material_aux (all_pieces s) empty_mat empty_mat.
+Fixpoint Vec_sum {n} : Vec nat n -> nat :=
+  match n with
+  | 0 => fun _ => 0
+  | S m => fun v => fst v + Vec_sum (snd v)
+  end.
 
-Definition KRvK_mat : Material := {|
-  queen_ct := 0;
-  rook_ct := 1;
-  bishop_ct := 0;
-  knight_ct := 0;
-  |}.
-
-Definition KRvK_total_mat : TotalMaterial := {|
-  white_material := KRvK_mat;
-  black_material := empty_mat;
-  |}.
-
-Definition KRvK : Game.GameState ChessGame -> Prop :=
-  fun s => TotalMaterial_le (get_material s) KRvK_total_mat.
-
-Definition list_count {X} `{Discrete X} (x : X) (l : list X) : nat :=
-  List.length (filter (eqb x) l).
-
-Lemma list_count_cons {X} `{Discrete X} (x x' : X) (l : list X) :
-  list_count x (x' :: l) =
-  if eqb x x' then S (list_count x l) else list_count x l.
-Proof.
-  unfold list_count.
-  simpl.
-  destruct eqb; reflexivity.
-Qed.
-
-Lemma eqb_Some_Some {X} `{Discrete X} x x' :
-  eqb (Some x) (Some x') = eqb x x'.
-Proof.
-  unfold eqb.
-  destruct (eq_dec x x'), (eq_dec (Some x) (Some x')).
-  - reflexivity.
-  - congruence.
-  - congruence.
-  - reflexivity.
-Qed.
-
-Lemma eqb_Some_None {X} `{Discrete X} x :
-  eqb (Some x) None = false.
-Proof.
-  unfold eqb.
-  destruct (eq_dec (Some x) None).
-  - congruence.
-  - reflexivity.
-Qed.
-
-Lemma list_count_filter_Some {X} `{Discrete X} (x : X) (l : list (option X)) :
-  list_count x (filter_Some l) = list_count (Some x) l.
-Proof.
-  induction l as [|[x'|] l'].
-  - reflexivity.
-  - simpl.
-    repeat rewrite list_count_cons.
-    rewrite eqb_Some_Some.
-    destruct (eqb x x').
-    + rewrite IHl'.
-      reflexivity.
-    + exact IHl'.
-  - simpl.
-    rewrite list_count_cons.
-    rewrite eqb_Some_None.
-    exact IHl'.
-Qed.
-
-Definition board_count (s : ChessState) (p : Player * Piece) : nat := list_count p (all_pieces s).
-
-Lemma Mat_to_list_S {m n} {X} (mat : Mat X (S m) n) :
-  Mat.to_list mat =
-  Vec.to_list (fst mat) ++ Mat.to_list (snd mat).
+Lemma Vec_sum_cons {n} (x : nat) (v : Vec nat n) :
+  Vec_sum ((x,v) : Vec nat (S n)) = x + Vec_sum v.
 Proof.
   reflexivity.
 Qed.
 
-Lemma list_count_app {X} `{Discrete X} (x : X) (l1 l2 : list X) :
-  list_count x (l1 ++ l2) =
-  list_count x l1 + list_count x l2.
+Lemma Vec_sum_front_last {n} (v : Vec nat (S n)) :
+  Vec_sum v = VecRev.last v + Vec_sum (VecRev.front v).
 Proof.
-  unfold list_count.
-  rewrite filter_app.
-  rewrite app_length.
-  reflexivity.
+  induction n.
+  - reflexivity.
+  - destruct v as [x v].
+    simpl VecRev.last.
+    simpl VecRev.front.
+    do 2 rewrite Vec_sum_cons.
+    rewrite IHn; lia.
 Qed.
 
-Lemma list_count_Vec_to_list {n} {X} `{Discrete X} (x : X)
-  (v : Vec X n) :
-  list_count x (Vec.to_list v) =
-  list_sum (map (fun i =>
-    match eq_dec x (vaccess i v) with
-    | left _ => 1
-    | right _ => 0
-    end) (Fin.all_fin n)).
+Lemma Vec_sum_rev {n} (v : Vec nat n) : Vec_sum (VecRev.rev v) = Vec_sum v.
 Proof.
   induction n.
   - reflexivity.
   - simpl.
-    rewrite list_count_cons.
-    unfold eqb.
     rewrite IHn.
-    rewrite map_map.
-    destruct (eq_dec x (fst v)); reflexivity.
+    rewrite <- Vec_sum_front_last.
+    auto.
 Qed.
 
-Lemma list_count_Mat_to_list {m n} {X} `{Discrete X} (x : X)
-  (mat : Mat X m n) :
-  list_count x (Mat.to_list mat) =
-  list_sum (map (fun i => list_count x (Vec.to_list (vaccess i mat))) (Fin.all_fin m)).
+Lemma Vec_count_cons {X} `{Discrete X} {n} (x y : X) (v : Vec X n) :
+  Vec_count x ((y, v) : Vec X (S n)) = if eq_dec x y then S (Vec_count x v) else Vec_count x v.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma Vec_count_place_last {X} `{Discrete X} {n} (x y : X) (v : Vec X n) :
+  Vec_count x (VecRev.place_last y v) = if eq_dec x y then S (Vec_count x v) else Vec_count x v.
+Proof.
+  induction n.
+  - reflexivity.
+  - destruct v as [z v].
+    simpl VecRev.place_last.
+    repeat rewrite @Vec_count_cons.
+    rewrite IHn.
+    destruct (eq_dec x z), (eq_dec x y); auto.
+Qed.
+
+Lemma Vec_count_Vec_rev {X} `{Discrete X} {n} (x : X) (v : Vec X n) :
+  Vec_count x (VecRev.rev v) = Vec_count x v.
+Proof.
+  induction n.
+  - reflexivity.
+  - destruct v as [y v].
+    rewrite VecRev.rev_cons.
+    rewrite Vec_count_place_last.
+    rewrite IHn; auto.
+Qed.
+
+Definition Mat_count {X} `{Discrete X} {m n} (x : X) (M : Mat X m n) : nat :=
+  Vec_sum (vmap (Vec_count x) M).
+
+Lemma vmap_const {X Y} {n} (y : Y) (v : Vec X n) :
+  vmap (fun _ => y) v = vreplicate y.
+Proof.
+  induction n.
+  - reflexivity.
+  - simpl; rewrite IHn; auto.
+Qed.
+
+Lemma Vec_sum_vreplicate_zero {n} :
+  Vec_sum (vreplicate 0 : Vec nat n) = 0.
+Proof.
+  induction n.
+  - reflexivity.
+  - simpl; auto.
+Qed.
+
+Lemma vmap_cons {X Y} (f : X -> Y) {n} (x : X) (v : Vec X n) : vmap f ((x, v) : Vec X (S n)) = (f x, vmap f v).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma Mat_count_vzip {X} `{Discrete X} {m n} (x : X)
+  (c : Vec X m) (M : Mat X m n) :
+  Mat_count x (vzip pair c M : Mat X m (S n)) =
+  Vec_count x c + Mat_count x M.
+Proof.
+  induction m.
+  - destruct M; auto.
+  - destruct c as [y c'].
+    destruct M as [d M'].
+    simpl vzip.
+    unfold Mat_count in *.
+    do 2 rewrite vmap_cons.
+    do 2 rewrite Vec_sum_cons.
+    rewrite IHm.
+    simpl Vec_sum.
+    simpl Vec_count.
+    destruct (eq_dec x y); lia.
+Qed.
+
+Lemma Mat_count_transpose {X} `{Discrete X} {m n} (x : X) (M : Mat X m n) :
+  Mat_count x (MatAction.transpose M) = Mat_count x M.
 Proof.
   induction m.
   - simpl.
-    destruct mat.
-    reflexivity.
-  - rewrite Mat_to_list_S.
-    rewrite list_count_app.
-    rewrite IHm.
-    simpl Fin.all_fin.
-    rewrite map_cons.
-    rewrite map_map.
-    reflexivity.
+    destruct M.
+    unfold Mat_count.
+    simpl.
+    rewrite vmap_const.
+    apply Vec_sum_vreplicate_zero.
+  - destruct M as [c M'].
+    simpl MatAction.transpose.
+    rewrite Mat_count_vzip.
+    rewrite IHm; auto.
 Qed.
 
-Lemma list_sum_map_all_fin {n} (f g : Fin.Fin n -> nat) :
-  (forall i, f i = g i) ->
-  list_sum (map f (Fin.all_fin n)) =
-  list_sum (map g (Fin.all_fin n)).
+Lemma Mat_count_hreflect {X} `{Discrete X} {m n} (x : X) (M : Mat X m n) :
+  Mat_count x (MatAction.hreflect M) = Mat_count x M.
 Proof.
-  induction n.
-  - intro; reflexivity.
-  - intro Hfg; simpl.
-    rewrite Hfg.
-    do 2 rewrite map_map.
-    f_equal.
-    apply IHn.
-    intro; apply Hfg.
+  unfold Mat_count.
+  unfold MatAction.hreflect.
+  rewrite <- MatAction.rev_vmap.
+  rewrite Vec_sum_rev; auto.
 Qed.
 
-Lemma list_sum_map_all_fin_S {n} (f g : Fin.Fin n -> nat) (i : Fin.Fin n) :
-  f i = S (g i) ->
-  (forall j, j <> i -> f j = g j) ->
-  list_sum (map f (Fin.all_fin n)) =
-  S (list_sum (map g (Fin.all_fin n))).
+Lemma Mat_count_vreflect {X} `{Discrete X} {m n} (x : X) (M : Mat X m n) :
+  Mat_count x (MatAction.vreflect M) = Mat_count x M.
+Proof.
+  unfold Mat_count.
+  unfold MatAction.vreflect.
+  rewrite vmap_vmap.
+  rewrite vmap_ext with (g := Vec_count x); auto.
+  apply Vec_count_Vec_rev.
+Qed.
+
+Lemma Mat_count_act {X} `{Discrete X} {n} (x : X) (M : Mat X n n) (a : d8_group) :
+  Mat_count x (a @ M) = Mat_count x M.
+Proof.
+  destruct a; simpl.
+  - auto.
+  - rewrite Mat_count_transpose.
+    rewrite Mat_count_hreflect; auto.
+  - rewrite Mat_count_vreflect.
+    rewrite Mat_count_hreflect; auto.
+  - rewrite Mat_count_hreflect.
+    rewrite Mat_count_transpose; auto.
+  - rewrite Mat_count_hreflect; auto.
+  - rewrite Mat_count_vreflect; auto.
+  - rewrite Mat_count_transpose; auto.
+  - rewrite Mat_count_hreflect.
+    rewrite Mat_count_transpose.
+    rewrite Mat_count_hreflect; auto.
+Qed.
+
+Definition count (c : Player) (p : Piece) (b : Board) : nat :=
+  Mat_count (Some (c, p)) b.
+
+Definition KRvK_bound (c : Player) (p : Piece) : nat :=
+  match c, p with
+  | White, King => 1
+  | Black, King => 1
+  | White, Rook => 1
+  | _, _ => 0
+  end.
+
+Definition KRvK (s : Game.GameState ChessGame) : Prop :=
+  forall c p, count c p (board s) <= KRvK_bound c p.
+
+Lemma vaccess_Vec_count_pos {X} `{Discrete X} {n} (x : X)
+  (v : Vec X n) (i : Fin.Fin n) :
+  Vec.vaccess i v = x ->
+  Vec_count x v > 0.
+Proof.
+  induction n; intro pf.
+  - destruct i.
+  - destruct i as [[]|i]; simpl in *.
+    + destruct eq_dec; [lia|].
+      congruence.
+    + destruct eq_dec; [lia|].
+      apply IHn with (i := i); auto.
+Qed.
+
+Lemma Vec_count_vupdate_sub {X} `{Discrete X} {n} (x y : X)
+  (v : Vec X n) (i : Fin.Fin n) :
+  Vec.vaccess i v <> x ->
+  Vec.vaccess i v = y ->
+  Vec_count y (Vec.vupdate i x v) =
+  pred (Vec_count y v).
 Proof.
   induction n.
   - destruct i.
-  - intros Hfgi Hfgni; simpl.
-    destruct i as [[]|i].
-    + rewrite Hfgi; simpl.
-      do 2 f_equal.
-      do 2 rewrite map_map.
-      apply list_sum_map_all_fin.
-      intro j.
-      apply Hfgni.
-      discriminate.
-    + do 2 rewrite map_map.
-      rewrite IHn with (i := i) (g := fun j => g (inr j)); auto.
-      * rewrite Hfgni; [|discriminate].
-        apply Nat.add_succ_r.
-      * intros j Hj.
-        apply Hfgni.
-        congruence.
-Qed.
-
-Lemma list_sum_nz (xs : list nat) (n : nat) :
-  n <> 0 -> In n xs -> list_sum xs <> 0.
-Proof.
-  induction xs; intros n_nz n_in.
-  - destruct n_in.
-  - simpl.
-    destruct n_in as [|n_in].
-    + lia.
-    + specialize (IHxs n_nz n_in).
+  - destruct v as [z v].
+    destruct i as [[]|i]; simpl; intros; subst.
+    + destruct eq_dec; [contradiction|].
+      destruct eq_dec; [|contradiction].
+      reflexivity.
+    + rewrite IHn; auto.
+      destruct eq_dec; auto.
+      pose proof (vaccess_Vec_count_pos (Vec.vaccess i v) v i eq_refl).
       lia.
 Qed.
 
-Lemma list_sum_map_all_fin_P {n} (f g : Fin.Fin n -> nat) (i : Fin.Fin n) :
-  g i = S (f i) ->
-  (forall j, j <> i -> f j = g j) ->
-  list_sum (map f (Fin.all_fin n)) =
-  pred (list_sum (map g (Fin.all_fin n))).
+Lemma Vec_count_vupdate_add {X} `{Discrete X} {n} (x : X)
+  (v : Vec X n) (i : Fin.Fin n) :
+  Vec.vaccess i v <> x ->
+  Vec_count x (Vec.vupdate i x v) =
+  S (Vec_count x v).
 Proof.
   induction n.
   - destruct i.
-  - intros Hfgi Hfgni; simpl.
+  - destruct v as [z v].
+    destruct i as [[]|i]; simpl; intros; subst.
+    + destruct eq_dec; [|contradiction].
+      destruct eq_dec; [congruence|].
+      auto.
+    + rewrite IHn; auto.
+      destruct eq_dec; auto.
+Qed.
+
+Lemma Vec_count_vupdate_no_change {X} `{Discrete X} {n} (x y : X)
+  (v : Vec X n) (i : Fin.Fin n) :
+  Vec.vaccess i v <> x ->
+  Vec.vaccess i v <> y ->
+  x <> y ->
+  Vec_count y (Vec.vupdate i x v) =
+  Vec_count y v.
+Proof.
+  induction n.
+  - destruct i.
+  - destruct v as [z v].
+    destruct i as [[]|i]; simpl; intros.
+    + destruct eq_dec; [congruence|].
+      destruct (eq_dec y z); [congruence|].
+      auto.
+    + rewrite IHn; auto.
+Qed.
+
+Lemma Vec_sum_pos {n} (v : Vec nat n) (i : Fin.Fin n) :
+  vaccess i v > 0 ->
+  Vec_sum v > 0.
+Proof.
+  induction n; intro pf.
+  - destruct i.
+  - destruct i as [[]|i]; simpl in *.
+    + lia.
+    + apply IHn in pf; lia.
+Qed.
+
+Lemma maccess_Mat_count_pos {X} `{Discrete X} {m n} (x : X)
+  (M : Mat X m n) (c : Coord m n) :
+  Mat.maccess c M = x ->
+  Mat_count x M > 0.
+Proof.
+  intro pf; destruct c as [i j].
+  apply vaccess_Vec_count_pos in pf.
+  apply Vec_sum_pos with (i := i).
+  rewrite MatAction.vaccess_vmap; auto.
+Qed.
+
+Lemma Mat_count_mupdate_sub {X} `{Discrete X} {m n} (x y : X)
+  (M : Mat X m n) (c : Coord m n) :
+  Mat.maccess c M <> x ->
+  Mat.maccess c M = y ->
+  Mat_count y (Mat.mupdate c x M) =
+  pred (Mat_count y M).
+Proof.
+  destruct c as [i j].
+  unfold maccess, Mat_count, mupdate; simpl.
+  induction m.
+  - destruct i.
+  - destruct M as [c M'].
     destruct i as [[]|i].
-    + rewrite Hfgi; simpl.
-      f_equal.
-      do 2 rewrite map_map.
-      apply list_sum_map_all_fin.
-      intro j.
-      apply Hfgni; discriminate.
-    + do 2 rewrite map_map.
-      rewrite IHn with (i := i) (g := fun j => g (inr j)); auto.
-      * rewrite Hfgni; [|discriminate].
-        apply Nat.add_pred_r.
-        apply list_sum_nz with (n := g (inr i)).
-        -- congruence.
-        -- apply in_map with (f := fun j => g (inr j)).
-           apply Fin.all_fin_In.
-      * intros.
-        apply Hfgni; congruence.
+    + simpl; intros pf1 pf2.
+      rewrite Vec_count_vupdate_sub; auto; simpl.
+      apply vaccess_Vec_count_pos in pf2; lia.
+    + simpl; intros pf1 pf2.
+      rewrite IHm; auto.
+      apply maccess_Mat_count_pos with (c := (i,j)) in pf2.
+      unfold Mat_count in pf2; lia.
 Qed.
 
-Lemma vupdate_vaccess {n} {X} (v : Vec X n) (i : Fin.Fin n) :
-  vupdate i (vaccess i v) v = v.
+Lemma Mat_count_mupdate_add {X} `{Discrete X} {m n} (x : X)
+  (M : Mat X m n) (c : Coord m n) :
+  Mat.maccess c M <> x ->
+  Mat_count x (Mat.mupdate c x M) =
+  S (Mat_count x M).
 Proof.
-  induction n.
+  destruct c as [i j].
+  unfold maccess, Mat_count, mupdate; simpl.
+  induction m.
   - destruct i.
-  - destruct i; simpl.
-    + destruct v; reflexivity.
-    + rewrite IHn.
-      destruct v; reflexivity.
+  - destruct M as [c M'].
+    destruct i as [[]|i].
+    + simpl; intros.
+      rewrite Vec_count_vupdate_add; auto.
+    + simpl; intros.
+      rewrite IHm; auto.
 Qed.
 
-Lemma list_count_mupdate {m n} {X} `{Discrete X} (x x' : X)
-  (mat : Mat X m n) (i : Fin.Fin m) (j : Fin.Fin n) :
-  list_count x (Mat.to_list (mupdate (i, j) x' mat)) =
-  match eq_dec x x' with
-  | left _ =>
-    match eq_dec x (maccess (i, j) mat) with
-    | left _ => list_count x (Mat.to_list mat)
-    | right _ => S (list_count x (Mat.to_list mat))
-    end
-  | right _ =>
-    match eq_dec x (maccess (i, j) mat) with
-    | left _ => pred (list_count x (Mat.to_list mat))
-    | right _ => list_count x (Mat.to_list mat)
-    end
-  end.
+Lemma Mat_count_mupdate_no_change {X} `{Discrete X} {m n} (x y : X)
+  (M : Mat X m n) (c : Coord m n) :
+  Mat.maccess c M <> x ->
+  Mat.maccess c M <> y ->
+  x <> y ->
+  Mat_count y (Mat.mupdate c x M) =
+  Mat_count y M.
 Proof.
-  destruct (eq_dec x x') as [xx'_eq|xx'_neq].
-  - subst.
-    destruct (eq_dec x' (maccess (i, j) mat)) as [Hx'|Hx'].
-    + do 2 rewrite list_count_Mat_to_list.
-      apply list_sum_map_all_fin.
-      intro k.
-      destruct (eq_dec k i) as [Hik|Hik].
-      * subst.
-        unfold mupdate.
-        rewrite vaccess_vupdate_eq.
-        unfold maccess at 2.
-        rewrite vupdate_vaccess.
-        reflexivity.
-      * unfold mupdate.
-        rewrite vaccess_vupdate_neq; auto.
-    + do 2 rewrite list_count_Mat_to_list.
-      apply list_sum_map_all_fin_S with (i := i).
-      * unfold mupdate.
-        rewrite vaccess_vupdate_eq.
-        do 2 rewrite list_count_Vec_to_list.
-        apply list_sum_map_all_fin_S with (i := j).
-        -- rewrite vaccess_vupdate_eq.
-           destruct eq_dec; [|contradiction].
-           destruct eq_dec; [contradiction|].
-           reflexivity.
-        -- intros k Hk.
-           rewrite vaccess_vupdate_neq; auto.
-      * intros k Hk.
-        unfold mupdate.
-        rewrite vaccess_vupdate_neq; auto.
-  - destruct (eq_dec x (maccess (i, j) mat)) as [Hx|Hx].
-    + subst.
-      do 2 rewrite list_count_Mat_to_list.
-      apply list_sum_map_all_fin_P with (i := i).
-      * do 2 rewrite list_count_Vec_to_list.
-        apply list_sum_map_all_fin_S with (i := j).
-        -- unfold maccess, mupdate.
-           do 2 rewrite vaccess_vupdate_eq.
-           destruct eq_dec; [|contradiction].
-           destruct eq_dec; [contradiction|].
-           reflexivity.
-        -- intros k Hk.
-           unfold mupdate.
-           rewrite vaccess_vupdate_eq.
-           rewrite vaccess_vupdate_neq; auto.
-      * intros k Hk.
-        unfold mupdate.
-        rewrite vaccess_vupdate_neq; auto.
-    + do 2 rewrite list_count_Mat_to_list.
-      apply list_sum_map_all_fin.
-      intro k.
-      do 2 rewrite list_count_Vec_to_list.
-      apply list_sum_map_all_fin.
-      intro l.
-      unfold mupdate.
-      destruct (eq_dec k i) as [Hk|Hk].
-      * subst.
-        rewrite vaccess_vupdate_eq.
-        destruct (eq_dec l j) as [Hl|Hl].
-        -- subst.
-           rewrite vaccess_vupdate_eq.
-           destruct eq_dec; [contradiction|].
-           destruct eq_dec; [contradiction|].
-           reflexivity.
-        -- rewrite vaccess_vupdate_neq; auto.
-      * rewrite vaccess_vupdate_neq; auto.
+  destruct c as [i j].
+  unfold maccess, Mat_count, mupdate; simpl.
+  induction m.
+  - destruct i.
+  - destruct M as [c M'].
+    destruct i as [[]|i].
+    + simpl; intros.
+      rewrite Vec_count_vupdate_no_change; auto.
+    + simpl; intros.
+      rewrite IHm; auto.
 Qed.
 
-Lemma count_exec_Move_le (s : ChessState) (m : ChessMove s) (c : Player.Player) (p : Piece) :
-  board_count (exec_ChessMove m) (c, p) <=
-  board_count s (c, p).
+Lemma count_exec_move {s} (m : ChessMove s) : forall c p,
+  count c p (board (exec_ChessMove m)) <= count c p (board s).
 Proof.
-  unfold board_count.
-  destruct m; simpl.
-  pose proof (dest_orig_neq r) as do_neq.
-  destruct r; simpl in *.
-  unfold all_pieces.
-  unfold exec_RegularMove.
+  intros; destruct m.
+  unfold exec_ChessMove, exec_RegularMove.
   simpl board.
-  unfold updated_board.
-  unfold clear.
+  unfold updated_board, count, clear.
   unfold place_piece.
-  destruct premove; simpl in do_neq.
-  unfold Chess.origin.
-  destruct origin as [i j].
-  unfold Chess.dest.
-  destruct dest as [i' j'].
-  unfold Chess.piece.
-  repeat rewrite list_count_filter_Some.
-  rewrite @list_count_mupdate.
-  destruct eq_dec; [congruence|].
-  destruct eq_dec as [pf1|pf1].
-  - rewrite @list_count_mupdate.
-    destruct eq_dec; destruct eq_dec; lia.
-  - rewrite @list_count_mupdate.
-    destruct eq_dec as [pf2|pf2].
-    + destruct eq_dec as [pf3|pf3].
-      * lia.
-      * rewrite maccess_mupdate_neq in pf1.
-        -- pose proof (origin_lookup premove_legal) as pf.
-           simpl in pf.
-           elim pf1.
-           rewrite pf2.
-           symmetry; exact pf.
-        -- intro H.
-           apply do_neq.
-           inversion H; reflexivity.
-    + destruct eq_dec as [pf3|pf3].
-      * lia.
-      * lia.
+  destruct (eq_dec (c, p) (chess_to_play s, piece (premove r))) as [Heq|Hneq].
+  - rewrite Mat_count_mupdate_sub.
+    + rewrite <- Heq.
+      rewrite Mat_count_mupdate_add.
+      * simpl; lia.
+      * pose proof (dest_open (premove_legal r)) as pf.
+        intro pf'.
+        unfold open in pf.
+        unfold lookup_piece in pf.
+        rewrite pf' in pf.
+        apply (opp_no_fp (chess_to_play s)); congruence.
+    + rewrite Mat.maccess_mupdate_neq.
+      * rewrite origin_lookup; [|apply r].
+        discriminate.
+      * intro; apply (dest_orig_neq r); congruence.
+    + rewrite Heq.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply r.
+      * intro; apply (dest_orig_neq r); congruence.
+  - rewrite Mat_count_mupdate_no_change.
+    + destruct (eq_dec (Some (c, p)) (Mat.maccess (dest (premove r)) (board s)))
+        as [Heq|Hneq'].
+      * rewrite Mat_count_mupdate_sub; auto.
+        -- lia.
+        -- pose proof (dest_open (premove_legal r)) as pf.
+           unfold open in pf.
+           intro pf'.
+           unfold lookup_piece in pf.
+           rewrite pf' in pf.
+           apply (opp_no_fp (chess_to_play s)); congruence.
+      * rewrite Mat_count_mupdate_no_change; auto.
+        -- pose proof (dest_open (premove_legal r)) as pf.
+           unfold open in pf.
+           intro pf'.
+           unfold lookup_piece in pf.
+           rewrite pf' in pf.
+           apply (opp_no_fp (chess_to_play s)); congruence.
+        -- congruence.
+    + rewrite Mat.maccess_mupdate_neq.
+      * rewrite origin_lookup; [|apply r].
+        discriminate.
+      * intro; apply (dest_orig_neq r); congruence.
+    + rewrite Mat.maccess_mupdate_neq.
+      * rewrite origin_lookup; [|apply r].
+        congruence.
+      * intro; apply (dest_orig_neq r); congruence.
+    + discriminate.
 Qed.
 
-Lemma get_material_aux_correct (l : list (Player * Piece)) : forall (mw mb : Material),
-  get_material_aux l mw mb = {|
-    white_material := {|
-      queen_ct := list_count (White, Queen) l + queen_ct mw;
-      rook_ct := list_count (White, Rook) l + rook_ct mw;
-      bishop_ct := list_count (White, Bishop) l + bishop_ct mw;
-      knight_ct := list_count (White, Knight) l + knight_ct mw;
-    |};
-    black_material := {|
-      queen_ct := list_count (Black, Queen) l + queen_ct mb;
-      rook_ct := list_count (Black, Rook) l + rook_ct mb;
-      bishop_ct := list_count (Black, Bishop) l + bishop_ct mb;
-      knight_ct := list_count (Black, Knight) l + knight_ct mb;
-    |};
-  |}.
+Lemma count_act x b : forall c p,
+  count c p (x @ b) = count c p b.
 Proof.
-  induction l as [|[c p] l']; intros mw mb.
-  - simpl.
-    destruct mw,mb; reflexivity.
-  - destruct c, p; simpl.
-    + repeat rewrite list_count_cons; simpl.
-      unfold id.
-      rewrite IHl'.
-      reflexivity.
-    + repeat rewrite list_count_cons; simpl.
-      rewrite IHl'; simpl.
-      rewrite Nat.add_succ_r.
-      reflexivity.
-    + repeat rewrite list_count_cons; simpl.
-      rewrite IHl'; simpl.
-      rewrite Nat.add_succ_r.
-      reflexivity.
-    + repeat rewrite list_count_cons; simpl.
-      rewrite IHl'; simpl.
-      rewrite Nat.add_succ_r.
-      reflexivity.
-    + repeat rewrite list_count_cons; simpl.
-      rewrite IHl'; simpl.
-      rewrite Nat.add_succ_r.
-      reflexivity.
-    + repeat rewrite list_count_cons; simpl.
-      unfold id.
-      rewrite IHl'.
-      reflexivity.
-    + repeat rewrite list_count_cons; simpl.
-      rewrite IHl'; simpl.
-      rewrite Nat.add_succ_r.
-      reflexivity.
-    + repeat rewrite list_count_cons; simpl.
-      rewrite IHl'; simpl.
-      rewrite Nat.add_succ_r.
-      reflexivity.
-    + repeat rewrite list_count_cons; simpl.
-      rewrite IHl'; simpl.
-      rewrite Nat.add_succ_r.
-      reflexivity.
-    + repeat rewrite list_count_cons; simpl.
-      rewrite IHl'; simpl.
-      rewrite Nat.add_succ_r.
-      reflexivity.
-Qed.
-
-Lemma get_material_correct (s : ChessState) :
-  get_material s = {|
-    white_material := {|
-      queen_ct := board_count s (White, Queen);
-      rook_ct := board_count s (White, Rook);
-      bishop_ct := board_count s (White, Bishop);
-      knight_ct := board_count s (White, Knight);
-    |};
-    black_material := {|
-      queen_ct := board_count s (Black, Queen);
-      rook_ct := board_count s (Black, Rook);
-      bishop_ct := board_count s (Black, Bishop);
-      knight_ct := board_count s (Black, Knight);
-    |};
-  |}.
-Proof.
-  unfold get_material.
-  rewrite get_material_aux_correct.
-  unfold empty_mat; simpl.
-  repeat rewrite Nat.add_0_r.
-  unfold board_count.
-  reflexivity.
-Qed.
-
-Lemma Material_le_exec_move_white (s : Game.GameState ChessGame) (m : ChessMove s) :
-  Material_le (white_material (get_material (exec_ChessMove m)))
-  (white_material (get_material s)).
-Proof.
-  repeat rewrite get_material_correct; simpl.
-  repeat split; apply count_exec_Move_le.
-Qed.
-
-Lemma Material_le_exec_move_black (s : Game.GameState ChessGame) (m : ChessMove s) :
-  Material_le (black_material (get_material (exec_ChessMove m)))
-  (black_material (get_material s)).
-Proof.
-  repeat rewrite get_material_correct; simpl.
-  repeat split; apply count_exec_Move_le.
-Qed.
-
-Lemma TotalMaterial_le_exec_move (s : Game.GameState ChessGame) (m : ChessMove s) :
-  TotalMaterial_le (get_material (Game.exec_move s m)) (get_material s).
-Proof.
-  split.
-  - apply Material_le_exec_move_white.
-  - apply Material_le_exec_move_black.
+  intros; apply Mat_count_act.
 Qed.

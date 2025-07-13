@@ -30,13 +30,6 @@ Proof.
   - discriminate.
 Qed.
 
-(*
-Global Instance SymChess : Symmetry ChessGame.
-Proof.
-  exact SymChess.
-Admitted.
-*)
-
 Global Instance DiscPiece : Discrete Piece.
 Proof.
   constructor.
@@ -96,23 +89,77 @@ Global Instance KRvK_closed : Closed.Closed KRvK.
 Proof.
   constructor.
   intros s pf m.
-  unfold KRvK.
-  apply TotalMaterial_le_trans with (t2 := get_material s).
-  - apply TotalMaterial_le_exec_move.
-  - exact pf.
+  intros c p.
+  apply PeanoNat.Nat.le_trans with (m := count c p (board s)).
+  - apply count_exec_move.
+  - apply pf.
 Qed.
+
+Class ExhaustibleT X : Type := {
+  sigT_dec : forall P : X -> Prop,
+    (forall x, {P x} + {~ P x}) ->
+    { x : X & P x } + ({ x : X & P x} -> Empty_set)
+  }.
+
+Lemma pi_dec {X} `{ExhaustibleT X} {P : X -> Prop} :
+  (forall x, {P x} + {~ P x}) ->
+  {forall x, P x} + { ~ (forall x, P x) }.
+Proof.
+  intro P_dec.
+  destruct (sigT_dec (fun x => ~ P x)).
+  - intro x.
+    destruct (P_dec x).
+    + right; tauto.
+    + now left.
+  - right; intro pf.
+    destruct s as [x px].
+    apply px; apply pf.
+  - left; intro x.
+    destruct (P_dec x); auto.
+    elim e.
+    exists x; auto.
+Defined.
+
+Instance Player_ExhT : ExhaustibleT Player.Player.
+Proof.
+  constructor.
+  intros P P_dec.
+  destruct (P_dec Player.Black); [left; eexists; eauto|].
+  destruct (P_dec Player.White); [left; eexists; eauto|].
+  right; intros [[|] px]; contradiction.
+Defined.
+
+Instance Piece_ExhT : ExhaustibleT Piece.
+Proof.
+  constructor.
+  intros P P_dec.
+  destruct (P_dec King); [left; eexists; eauto|].
+  destruct (P_dec Queen); [left; eexists; eauto|].
+  destruct (P_dec Rook); [left; eexists; eauto|].
+  destruct (P_dec Bishop); [left; eexists; eauto|].
+  destruct (P_dec Knight); [left; eexists; eauto|].
+  right; intros [x px]; destruct x; contradiction.
+Defined.
 
 Global Instance KRvK_dec1 : Closed.Dec1 KRvK.
 Proof.
   constructor.
   intro s.
-  apply TotalMaterial_le_dec.
+  unfold KRvK.
+  apply pi_dec; intro c.
+  apply pi_dec; intro p.
+  apply Compare_dec.le_dec.
 Defined.
 
 Global Instance KRvK_bisim_closed :
   Closed.Bisim_closed auto KRvK.
 Proof.
-Admitted.
+  simpl; constructor.
+  intros s s' mat [x Hx] c p; subst.
+  rewrite board_act.
+  rewrite count_act.
+  apply mat.
+Qed.
 
 Definition certified_Chess_TB : OCamlTablebase ChessGame :=
   certified_TB.
