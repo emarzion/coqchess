@@ -3,6 +3,7 @@ Require Import Chess.Util.GroupAction.
 Require Import Chess.Util.D8.
 Require Import Chess.Util.Mat.
 Require Import Chess.Util.Vec.
+Require Import Chess.Util.Fin.
 Require Import Chess.Util.VecRev.
 Require Import Chess.Util.MatAction.
 Require Import Chess.Util.PosAction.
@@ -52,11 +53,6 @@ Proof.
   rewrite <- inv_right with (x := x).
   rewrite <- act_assoc.
   apply maccess_act.
-Qed.
-
-Lemma val_inr {n} (i : Fin.Fin n) : Fin.val (inr i : Fin.Fin (S n)) = S (Fin.val i).
-Proof.
-  reflexivity.
 Qed.
 
 Lemma val_last {n} : Fin.val (Fin.last : Fin.Fin (S n)) = n.
@@ -141,19 +137,6 @@ Proof.
       rewrite PeanoNat.Nat.sub_succ_l; auto.
       simpl.
       apply IHn; auto.
-Qed.
-
-Lemma val_bound {n} (i : Fin.Fin n) :
-  Fin.val i < n.
-Proof.
-  induction n.
-  - destruct i.
-  - destruct i as [|j].
-    + simpl.
-      apply PeanoNat.Nat.lt_0_succ.
-    + rewrite val_inr.
-      apply Arith_base.lt_n_S_stt.
-      apply IHn.
 Qed.
 
 Lemma Fin_dist_Fin_rev {n} (i j : Fin.Fin n) :

@@ -6,10 +6,7 @@ Require Import Chess.Util.UIP.
 Require Import Games.Util.Dec.
 Require Import Chess.TB.Material.
 Require Import Chess.TB.Symmetry.
-
-Global Instance Hash_ChessState : IntHash.CondIntHash KRvK.
-Proof.
-Admitted.
+Require Import Chess.TB.Hash.
 
 Global Instance ReverseChess : Reversible ChessGame.
 Proof.
