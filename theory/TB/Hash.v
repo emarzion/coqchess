@@ -14,6 +14,7 @@ Require Import Chess.Util.Fin.
 Require Import TBGen.Util.IntHash.
 
 Require Import Chess.TB.Material.
+Require Import Chess.TB.MaterialPositions.
 Require Import Chess.TB.StateAction.
 
 (*
@@ -335,8 +336,6 @@ Definition hash_Player (p : Player) : int :=
 Definition add_Player (p : Player) (x : int) : int :=
   intpair (hash_Player p) x 1.
 
-Definition material_positions : Type :=
-  Player -> Piece -> list Pos.
 
 Lemma hash_Player_small : forall p,
   (to_Z (hash_Player p) < 2)%Z.
@@ -653,24 +652,6 @@ Proof.
            simpl length in *. lia.
         -- apply Z.pow_le_mono_r; simpl length in *; lia.
 Qed.
-
-Definition mp_of_board (b : Board) : material_positions.
-Proof.
-  
-Admitted.
-
-Lemma mp_of_board_eq : forall b b',
-  (forall c p, mp_of_board b c p = mp_of_board b' c p) -> b = b'.
-Admitted.
-
-Lemma mp_of_board_King : forall c s,
-  mp_of_board (board s) c King = [king s c].
-Admitted.
-
-Lemma mp_of_board_count b c p :
-  length (mp_of_board b c p) =
-  count c p b.
-Admitted.
 
 Ltac get_bounds p :=
   pose proof (p Black Knight);
@@ -1128,14 +1109,6 @@ Definition kingless_material_size (m : material) : nat :=
   m Black Rook +
   m Black Bishop +
   m Black Knight.
-
-Lemma king_count : forall c s,
-  count c King (board s) = 1.
-Proof.
-  intros.
-  rewrite <- mp_of_board_count.
-  rewrite mp_of_board_King; auto.
-Qed.
 
 Lemma kingless_50 m s:
   kingless_material_size m <= 6 ->

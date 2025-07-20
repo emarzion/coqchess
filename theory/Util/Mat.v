@@ -51,3 +51,13 @@ Qed.
 
 Definition to_list {X} {m n} (M : Mat X m n) : list X :=
   concat (Vec.to_list (vmap Vec.to_list M)).
+
+Lemma mat_ext {X} {m n} (M M' : Mat X m n) :
+  (forall c, maccess c M = maccess c M') -> M = M'.
+Proof.
+  intro pf.
+  apply vec_ext; intro i.
+  apply vec_ext; intro j.
+  apply (pf (i,j)).
+Qed.
+
