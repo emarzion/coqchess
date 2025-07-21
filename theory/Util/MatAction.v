@@ -36,11 +36,6 @@ Proof.
   - apply rev_rev.
 Qed.
 
-Lemma unit_eq : forall u u' : unit, u = u'.
-Proof.
-  now destruct u, u'.
-Qed.
-
 Lemma vec_unit_eq {n} : forall v v' : Vec unit n,
   v = v'.
 Proof.
@@ -74,20 +69,6 @@ Proof.
     now rewrite IHm.
 Qed.
 
-Lemma vec_ext {X} {n} (v v' : Vec X n) :
-  (forall i, vaccess i v = vaccess i v') -> v = v'.
-Proof.
-  intro pf.
-  induction n.
-  - apply unit_eq.
-  - destruct v as [x w].
-    destruct v' as [x' w'].
-    f_equal.
-    + apply (pf (inl tt)).
-    + apply IHn; intro j.
-      apply (pf (inr j)).
-Qed.
-
 Lemma vaccess_vmap {X Y} (f : X -> Y) {n} (v : Vec X n) (i : Fin.Fin n) :
   vaccess i (vmap f v) = f (vaccess i v).
 Proof.
@@ -109,15 +90,6 @@ Proof.
     destruct i as [[]|j].
     + reflexivity.
     + apply IHn.
-Qed.
-
-Lemma mat_ext {X} {m n} (M M' : Mat X m n) :
-  (forall c, maccess c M = maccess c M') -> M = M'.
-Proof.
-  intro pf.
-  apply vec_ext; intro i.
-  apply vec_ext; intro j.
-  apply (pf (i,j)).
 Qed.
 
 Lemma maccess_transpose {X} {m n} (M : Mat X m n) i j :

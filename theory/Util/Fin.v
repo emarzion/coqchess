@@ -422,3 +422,21 @@ Proof.
   rewrite <- (Fin_rev_Fin_rev last).
   rewrite Fin_rev_last; auto.
 Qed.
+
+Lemma val_inr {n} (i : Fin.Fin n) : Fin.val (inr i : Fin.Fin (S n)) = S (Fin.val i).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma val_bound {n} (i : Fin.Fin n) :
+  Fin.val i < n.
+Proof.
+  induction n.
+  - destruct i.
+  - destruct i as [|j].
+    + simpl.
+      apply PeanoNat.Nat.lt_0_succ.
+    + rewrite val_inr.
+      apply Arith_base.lt_n_S_stt.
+      apply IHn.
+Qed.

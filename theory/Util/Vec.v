@@ -120,3 +120,22 @@ Fixpoint vzip {X Y Z} (f : X -> Y -> Z) {n} : Vec X n -> Vec Y n -> Vec Z n :=
     | (x,v'), (y,w') => (f x y, vzip f v' w')
     end
   end.
+
+Lemma unit_eq : forall u u' : unit, u = u'.
+Proof.
+  now destruct u, u'.
+Qed.
+
+Lemma vec_ext {X} {n} (v v' : Vec X n) :
+  (forall i, vaccess i v = vaccess i v') -> v = v'.
+Proof.
+  intro pf.
+  induction n.
+  - apply unit_eq.
+  - destruct v as [x w].
+    destruct v' as [x' w'].
+    f_equal.
+    + apply (pf (inl tt)).
+    + apply IHn; intro j.
+      apply (pf (inr j)).
+Qed.
