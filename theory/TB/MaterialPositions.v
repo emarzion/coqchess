@@ -8,6 +8,8 @@ Require Import Chess.Chess.
 
 Require Import Chess.TB.Material.
 
+Require Import Chess.Util.MatAction.
+
 Definition material_positions : Type :=
   Player -> Piece -> list Pos.
 
@@ -55,6 +57,29 @@ Fixpoint mp_of_indcol {k} : Vec.Vec (Fin.Fin 8 (*m*) *
 Definition mp_app (m1 m2 : material_positions) : material_positions :=
   fun c p => m1 c p ++ m2 c p.
 
+Lemma In_mp_app_left m1 m2 c p x :
+  In x (m1 c p) ->
+  In x (mp_app m1 m2 c p).
+Proof.
+  intro pf.
+  apply in_or_app; now left.
+Qed.
+
+Lemma In_mp_app_right m1 m2 c p x :
+  In x (m2 c p) ->
+  In x (mp_app m1 m2 c p).
+Proof.
+  intro pf.
+  apply in_or_app; now right.
+Qed.
+
+Lemma In_mp_app_inv m1 m2 c p x :
+  In x (mp_app m1 m2 c p) ->
+  In x (m1 c p) \/ In x (m2 c p).
+Proof.
+  intro; apply in_app_or; auto.
+Qed.
+
 Fixpoint mp_concat {n} : Vec.Vec material_positions n -> 
   material_positions :=
   match n with
@@ -65,17 +90,357 @@ Fixpoint mp_concat {n} : Vec.Vec material_positions n ->
 Definition mp_of_board (b : Board) : material_positions :=
   mp_concat (Vec.vmap mp_of_indcol (with_coords b)).
 
+Lemma vaccess_indices {n} (i : Fin.Fin n) :
+  Vec.vaccess i indices = i.
+Proof.
+  induction n.
+  - destruct i.
+  - destruct i as [[]|j].
+    + reflexivity.
+    + simpl.
+      rewrite vaccess_vmap.
+      rewrite IHn; auto.
+Qed.
+
+Lemma In_mp_concat1 {n} c p x (v : Vec.Vec material_positions n) :
+  forall i,
+    In x (Vec.vaccess i v c p) ->
+    In x (mp_concat v c p).
+Proof.
+  induction n; intros i pf.
+  - destruct i.
+  - destruct i as [[]|j].
+    + simpl in *.
+      apply In_mp_app_left; auto.
+    + apply IHn in pf.
+      simpl; apply In_mp_app_right; auto.
+Qed.
+
+Lemma In_mp_concat2 {n} c p x (v : Vec.Vec material_positions n) :
+  In x (mp_concat v c p) ->
+  exists i, In x (Vec.vaccess i v c p).
+Proof.
+  induction n; intros pf.
+  - destruct pf.
+  - simpl in pf.
+    apply In_mp_app_inv in pf.
+    destruct pf as [pf1|pf2].
+    + exists (inl tt); auto.
+    + apply IHn in pf2.
+      destruct pf2 as [i Hi].
+      exists (inr i); auto.
+Qed.
+
+Lemma NoDup_mp_concat {n} c p (v : Vec.Vec material_positions n) :
+  (forall i, NoDup (Vec.vaccess i v c p)) ->
+  (forall i j x, In x (Vec.vaccess i v c p) -> In x (Vec.vaccess j v c p) -> i = j) ->
+  NoDup (mp_concat v c p).
+Proof.
+  induction n; intros cmp_nd pw_disj.
+  - simpl; constructor.
+  - simpl.
+    apply TB.NoDup_app.
+    + apply (cmp_nd (inl tt)).
+    + apply IHn.
+      * intro i; apply (cmp_nd (inr i)).
+      * intros i j x pfi pfj.
+        pose proof (pw_disj (inr i) (inr j) x pfi pfj).
+        congruence.
+    + intros x pf1 pf2.
+      apply In_mp_concat2 in pf2.
+      destruct pf2 as [i Hi].
+      pose proof (pw_disj (inl tt) (inr i) x pf1 Hi).
+      discriminate.
+Qed.
+
+Lemma eq_dec_refl {X Y} `{Discrete X} (x : X) (y y' : Y) :
+  match eq_dec x x with
+  | left _ => y
+  | right _ => y'
+  end = y.
+Proof.
+  destruct eq_dec.
+  - auto.
+  - contradiction.
+Qed.
+
+Lemma In_mp_add_pos_left c p x m :
+  In x (mp_add_pos c p x m c p).
+Proof.
+  unfold mp_add_pos.
+  rewrite eq_dec_refl.
+  now left.
+Qed.
+
+Lemma In_mp_add_pos_right c c' p p' x x' m :
+  In x (m c p) ->
+  In x (mp_add_pos c' p' x' m c p).
+Proof.
+  intro pf.
+  unfold mp_add_pos; destruct eq_dec.
+  - now right.
+  - auto.
+Qed.
+
+Lemma In_mp_add_pos_inv c c' p p' x x' m :
+  In x (mp_add_pos c' p' x' m c p) ->
+  (x = x' /\ c = c' /\ p = p') \/ In x (m c p).
+Proof.
+  unfold mp_add_pos.
+  destruct eq_dec; intro pf.
+  - destruct pf.
+    + left; inversion e; firstorder.
+    + right; auto.
+  - now right.
+Qed.
+
+Lemma mp_of_indcol_In {n} (v: Vec.Vec (Fin.Fin 8 * (Fin.Fin 8 * option (Player * Piece))) n) : forall i j c p k,
+  Vec.vaccess k v = (i, (j, (Some (c, p)))) ->
+  In (i, j) (mp_of_indcol v c p).
+Proof.
+  intros i j c p k pf.
+  induction n.
+  - destruct k.
+  - destruct k as [[]|k'].
+    + destruct v as [hd v'].
+      simpl in pf.
+      rewrite pf; simpl.
+      apply In_mp_add_pos_left.
+    + destruct v as [[i' [j' o]] v'].
+      destruct o as [[c' p']|]; simpl in pf; simpl.
+      * apply IHn in pf.
+        apply In_mp_add_pos_right; auto.
+      * apply IHn in pf; auto.
+Qed.
+
+Lemma In_mp_of_indcol_inv {n} (v : Vec.Vec (Fin.Fin 8 *
+  (Fin.Fin 8 * option (Player * Piece))) n) i j c p :
+  In (i, j) (mp_of_indcol v c p) ->
+  exists k : Fin.Fin n,
+    Vec.vaccess k v = (i, (j, Some (c, p))).
+Proof.
+  induction n; intro pf.
+  - destruct pf.
+  - destruct v as [hd v'].
+    destruct hd as [i' [j' o]].
+    destruct o as [[c' p']|].
+    + simpl in pf.
+      apply In_mp_add_pos_inv in pf.
+      destruct pf as [pf|pf].
+      * exists (inl tt).
+        destruct pf as [pf1 [pf2 pf3]].
+        simpl.
+        inversion pf1; subst; auto.
+      * apply IHn in pf.
+        destruct pf as [k Hk].
+        exists (inr k); auto.
+    + simpl in pf.
+      apply IHn in pf.
+      destruct pf as [k Hk].
+      exists (inr k); auto.
+Qed.
+
+Lemma to_list_cons {X} {n} (x : X) (v : Vec.Vec X n) :
+  Vec.to_list ((x, v) : Vec.Vec X (S n)) = x :: Vec.to_list v.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma In_to_list {X} {n} (x : X) (i : Fin.Fin n)
+  (v : Vec.Vec X n) :
+  Vec.vaccess i v = x ->
+  In x (Vec.to_list v).
+Proof.
+  induction n; intro pf.
+  - destruct i.
+  - destruct i as [[]|j].
+    + now left.
+    + right; apply (IHn j); auto.
+Qed.
+
+Lemma mp_of_indcol_NoDup {n} (v : Vec.Vec (Fin.Fin 8 *
+  (Fin.Fin 8 * option (Player * Piece))) n) c p :
+  NoDup (Vec.to_list (Vec.vmap (fun x => fst (snd x)) v)) ->
+  NoDup (mp_of_indcol v c p).
+Proof.
+  induction n; intro pf.
+  - constructor.
+  - destruct v as [hd v'].
+    destruct hd as [i [j o]].
+    simpl; destruct o as [[c' p']|].
+    + unfold mp_add_pos.
+      destruct eq_dec.
+      * constructor.
+        -- intro pf'.
+           rewrite vmap_cons in pf.
+           simpl fst in pf; simpl snd in pf.
+           rewrite to_list_cons in pf.
+           rewrite NoDup_cons_iff in pf.
+           destruct pf as [pf1 pf2].
+           apply pf1.
+           apply In_mp_of_indcol_inv in pf'.
+           destruct pf' as [k Hk].
+           apply In_to_list with (i := k).
+           rewrite vaccess_vmap.
+           rewrite Hk; auto.
+        -- inversion pf; auto.
+      * apply IHn.
+        inversion pf; auto.
+    + apply IHn.
+      inversion pf; auto.
+Qed.
+
+Lemma to_list_vmap {X Y} {n} (f : X -> Y) (v : Vec.Vec  X n) :
+  Vec.to_list (Vec.vmap f v) = List.map f (Vec.to_list v).
+Proof.
+  induction n.
+  - auto.
+  - simpl; rewrite IHn; auto.
+Qed.
+
+Lemma to_list_vzip_pair {X Y} {n} (v1 : Vec.Vec X n)
+  (v2 : Vec.Vec Y n) :
+  Vec.to_list (Vec.vzip pair v1 v2) =
+  combine (Vec.to_list v1) (Vec.to_list v2).
+Proof.
+  induction n.
+  - auto.
+  - destruct v1 as [x1 w1].
+    destruct v2 as [x2 w2].
+    simpl; rewrite IHn; auto.
+Qed.
+
+Lemma map_fst_combine {X Y} (l1 : list X) : forall (l2 : list Y),
+  length l1 = length l2 ->
+  map fst (combine l1 l2) = l1.
+Proof.
+  induction l1; intros l2 pf.
+  - reflexivity.
+  - destruct l2.
+    + discriminate.
+    + simpl; rewrite IHl1; auto.
+Qed.
+
+Lemma length_to_list {X} {n} (v : Vec.Vec X n) :
+  length (Vec.to_list v) = n.
+Proof.
+  induction n.
+  - auto.
+  - simpl; rewrite IHn; auto.
+Qed.
+
+Lemma to_list_indices {n} :
+  Vec.to_list (@indices n) = Fin.all_fin n.
+Proof.
+  induction n.
+  - auto.
+  - simpl.
+    rewrite to_list_vmap.
+    rewrite IHn; auto.
+Qed.
+
+Lemma NoDup_map_inj {X Y} (f : X -> Y) (xs : list X)
+  (f_inj : forall x x', f x = f x' -> x = x') :
+  NoDup xs -> NoDup (map f xs).
+Proof.  
+  induction xs; intro nd.
+  - constructor.
+  - simpl; constructor.
+    + intro pf.
+      rewrite in_map_iff in pf.
+      destruct pf as [x [Hx1 Hx2]].
+      apply f_inj in Hx1; subst.
+      inversion nd; contradiction.
+    + apply IHxs.
+      inversion nd; auto.
+Qed.
+
+Lemma all_fin_NoDup {n} :
+  NoDup (Fin.all_fin n).
+Proof.
+  induction n.
+  - constructor.
+  - simpl; constructor.
+    + intro pf.
+      rewrite in_map_iff in pf.
+      destruct pf as [i [Hi _]].
+      discriminate.
+    + apply NoDup_map_inj.
+      * intros; congruence.
+      * auto.
+Qed.
+
 Lemma mp_of_board_NoDup b : forall c p,
   NoDup (mp_of_board b c p).
-Admitted.
+Proof.
+  intros c p.
+  apply NoDup_mp_concat.
+  - intro i.
+    rewrite vaccess_vmap.
+    unfold with_coords.
+    rewrite vaccess_vzip.
+    rewrite vaccess_vmap.
+    unfold with_indices.
+    rewrite vaccess_indices.
+    apply mp_of_indcol_NoDup.
+    rewrite Vec.vmap_vmap.
+    simpl snd.
+    rewrite to_list_vmap.
+    rewrite to_list_vzip_pair.
+    rewrite map_fst_combine.
+    + rewrite to_list_indices.
+      apply all_fin_NoDup.
+    + do 2 rewrite length_to_list; auto.
+  - intros i j [i' j'] pf1 pf2.
+    rewrite vaccess_vmap in *.
+    apply In_mp_of_indcol_inv in pf1, pf2.
+    destruct pf1 as [k Hk].
+    destruct pf2 as [k' Hk'].
+    unfold with_coords in *.
+    rewrite vaccess_vzip in *.
+    repeat rewrite vaccess_vmap in *.
+    rewrite vaccess_indices in *.
+    congruence.
+Qed.
 
 Lemma mp_of_board_correct1 (b : Board) : forall c p x,
   Mat.maccess x b = Some (c, p) -> In x (mp_of_board b c p).
-Admitted.
+Proof.
+  intros c p [i j] pf.
+  apply In_mp_concat1 with (i := i).
+  rewrite vaccess_vmap.
+  unfold with_coords.
+  rewrite vaccess_vzip.
+  rewrite vaccess_indices.
+  rewrite vaccess_vmap.
+  apply mp_of_indcol_In with (k := j).
+  rewrite vaccess_vmap.
+  unfold with_indices.
+  rewrite vaccess_vzip.
+  rewrite vaccess_indices.
+  repeat f_equal; auto.
+Qed.
 
 Lemma mp_of_board_correct2 (b : Board) : forall c p x,
   In x (mp_of_board b c p) -> Mat.maccess x b = Some (c, p).
-Admitted.
+Proof.
+  intros c p [i j] pf.
+  unfold mp_of_board in pf.
+  apply In_mp_concat2 in pf.
+  destruct pf as [k Hk].
+  rewrite vaccess_vmap in Hk.
+  apply In_mp_of_indcol_inv in Hk.
+  destruct Hk as [k' Hk'].
+  unfold with_coords in Hk'.
+  rewrite vaccess_vzip in Hk'.
+  do 2 rewrite vaccess_vmap in Hk'.
+  unfold with_indices in Hk'.
+  rewrite vaccess_vzip in Hk'.
+  do 2 rewrite vaccess_indices in Hk'.
+  unfold Mat.maccess.
+  simpl fst; simpl snd.
+  congruence.
+Qed. (*?*)
 
 Lemma mp_of_board_eq : forall b b',
   (forall c p, mp_of_board b c p = mp_of_board b' c p) -> b = b'.
@@ -143,20 +508,6 @@ Proof.
     rewrite <- IHn.
     unfold mp_app.
     rewrite app_length; auto.
-Qed.
-
-Require Import Chess.Util.MatAction.
-
-Lemma vaccess_indices {n} (i : Fin.Fin n) :
-  Vec.vaccess i indices = i.
-Proof.
-  induction n.
-  - destruct i.
-  - destruct i as [[]|j].
-    + reflexivity.
-    + simpl.
-      rewrite vaccess_vmap.
-      rewrite IHn; auto.
 Qed.
 
 Lemma length_mp_add_cons c c' p p' x m :
