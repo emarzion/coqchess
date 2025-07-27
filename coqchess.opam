@@ -16,7 +16,7 @@ install: [dune install]
 
 depends: [
   "ocaml" {>= "4.14.0"}
-  "coq" {>= "8.15.2" & <= "8.19.0"}
+  "coq" {= "8.19.0"}
   "games"
   "coqtbgen"
 ]
@@ -27,5 +27,5 @@ authors: [
 
 pin-depends: [
   ["games.dev" "git+https://github.com/emarzion/games.git#34923d2e23d72365fb7fb1b00725881431aea165"]
-  ["coqtbgen.dev" "git+https://github.com/emarzion/coqtbgen.git#edb33b946710d48a05989cf73b37a9df784dc6d0"]
+  ["coqtbgen.dev" "git+https://github.com/emarzion/coqtbgen.git#ee1a86e2571ef51e8931676648210c7bb9e0fac2"]
 ]
