@@ -193,20 +193,11 @@ Definition count (c : Player) (p : Piece) (b : Board) : nat :=
 Definition material : Type :=
   Player -> Piece -> nat.
 
-Definition KRvK_material : material :=
-  fun c p =>
-    match c, p with
-    | White, King => 1
-    | Black, King => 1
-    | White, Rook => 1
-    | _, _ => 0
-    end.
+Definition material_eq (m : material) : Game.GameState ChessGame -> Prop :=
+  fun s => forall c p, count c p (board s) = m c p.
 
 Definition material_bound (m : material) : Game.GameState ChessGame -> Prop :=
   fun s => forall c p, count c p (board s) <= m c p.
-
-Definition KRvK (s : Game.GameState ChessGame) : Prop :=
-  material_bound KRvK_material s.
 
 Lemma vaccess_Vec_count_pos {X} `{Discrete X} {n} (x : X)
   (v : Vec X n) (i : Fin.Fin n) :
