@@ -1308,18 +1308,296 @@ Proof.
       apply NoDup_cfg_rank; auto.
 Qed.
 
-Definition W_oppose_checkmates : list ChessState.
+Record oppose_config : Type :=  mk_oppose_config {
+  edge : Pos;
+  opp_check : check_type
+  }.
+
+Definition third_file (f : File) : File :=
+  if Dec.eq_dec f file_a then file_c else file_f.
+
+Definition third_rank (r : Rank) : Rank :=
+  if Dec.eq_dec r rank_1 then rank_3 else rank_6.
+
+Definition oppose_configs : list oppose_config :=
+  map (fun r => {|
+    edge := (file_a, r);
+    opp_check := vert
+  |}) (all_fin 8) ++
+  map (fun r => {|
+    edge := (file_h, r);
+    opp_check := vert
+  |}) (all_fin 8) ++
+  map (fun f => {|
+    edge := (f, rank_1);
+    opp_check := horiz
+  |}) (all_fin 8) ++
+  map (fun r => {|
+    edge := (r, rank_8);
+    opp_check := horiz
+  |}) (all_fin 8).
+
+Definition W_oppose_pre_checkmates : list PreChessState.
+Proof.
+  refine (flat_map (fun cfg => _) oppose_configs).
+  refine (match opp_check cfg with
+          | vert => _
+          | horiz => _
+          end).
+  - refine (map (fun i => _) (at_least_two_away (rank (edge cfg)))).
+    pose (bk := edge cfg).
+    pose (wk := (third_file (file (edge cfg)), rank (edge cfg))).
+    pose (wr := (file (edge cfg), i)).
+    pose (b :=
+      place_pieces [
+        ((White, King), wk);
+        ((Black, King), bk);
+        ((White, Rook), wr)
+      ]).
+    exact {|
+      pre_chess_to_play := Black;
+      pre_board := b;
+      pre_white_king := wk;
+      pre_black_king := bk;
+      |}.
+  - refine (map (fun i => _) (at_least_two_away (file (edge cfg)))).
+    pose (bk := edge cfg).
+    pose (wk := (file (edge cfg), third_file (rank (edge cfg)))).
+    pose (wr := (i, rank (edge cfg))).
+    pose (b :=
+      place_pieces [
+        ((White, King), wk);
+        ((Black, King), bk);
+        ((White, Rook), wr)
+      ]).
+    exact {|
+      pre_chess_to_play := Black;
+      pre_board := b;
+      pre_white_king := wk;
+      pre_black_king := bk;
+      |}.
+Defined.
+
+Lemma W_oppose_pre_checkmates_correct1 :
+  Forall pre_lookup_white_king W_oppose_pre_checkmates.
+Proof.
+  unfold W_oppose_pre_checkmates.
+  rewrite Forall_flat_map.
+  rewrite Forall_forall.
+  intros cfg Hcfg.
+  destruct (opp_check cfg) eqn:Hchk.
+  - rewrite Forall_map.
+    rewrite Forall_forall.
+    intros ? _.
+    unfold pre_lookup_white_king; simpl.
+    rewrite lookup_place_eq; auto.
+  - rewrite Forall_map.
+    rewrite Forall_forall.
+    intros ? _.
+    unfold pre_lookup_white_king; simpl.
+    rewrite lookup_place_eq; auto.
+Qed.
+
+Lemma W_oppose_pre_checkmates_correct2 :
+  Forall pre_lookup_black_king W_oppose_pre_checkmates.
+Proof.
+  unfold W_oppose_pre_checkmates.
+  rewrite Forall_flat_map.
+  rewrite Forall_forall.
+  intros cfg Hcfg.
+  destruct (opp_check cfg) eqn:Hchk.
+  - rewrite Forall_map.
+    rewrite Forall_forall.
+    intros ? _.
+    unfold pre_lookup_black_king; simpl.
+    rewrite lookup_place_neq.
+    + rewrite lookup_place_eq; auto.
+    + apply file_neq; simpl.
+      admit.
+  - rewrite Forall_map.
+    rewrite Forall_forall.
+    intros ? _.
+    unfold pre_lookup_black_king; simpl.
+    rewrite lookup_place_neq.
+    + rewrite lookup_place_eq; auto.
+    + apply rank_neq; simpl.
+      admit.
 Admitted.
+
+Lemma W_oppose_pre_checkmates_correct3 :
+  Forall pre_kings_unique W_oppose_pre_checkmates.
+Proof.
+  unfold W_oppose_pre_checkmates.
+  rewrite Forall_flat_map.
+  rewrite Forall_forall.
+  intros cfg Hcfg.
+  destruct (opp_check cfg) eqn:Hchk.
+  - rewrite Forall_map.
+    rewrite Forall_forall.
+    intros ? _.
+    unfold pre_kings_unique; simpl.
+    intros [] p; simpl.
+    + intro pf.
+      lookup_piece_inversion;
+      (reflexivity || discriminate).
+    + intro pf.
+      lookup_piece_inversion;
+      (reflexivity || discriminate).
+  - rewrite Forall_map.
+    rewrite Forall_forall.
+    intros ? _.
+    unfold pre_kings_unique; simpl.
+    intros [] p; simpl.
+    + intro pf.
+      lookup_piece_inversion;
+      (reflexivity || discriminate).
+    + intro pf.
+      lookup_piece_inversion;
+      (reflexivity || discriminate).
+Qed.
+
+Lemma W_oppose_pre_checkmates_correct4 :
+  Forall pre_opp_to_play_not_in_check W_oppose_pre_checkmates.
+Proof.
+  unfold W_oppose_pre_checkmates.
+  rewrite Forall_flat_map.
+  rewrite Forall_forall.
+  intros cfg Hcfg.
+  destruct (opp_check cfg) eqn:Hchk.
+  - rewrite Forall_map.
+    rewrite Forall_forall.
+    intros ? _.
+    unfold pre_opp_to_play_not_in_check; simpl.
+    intros pos pf1 pf2; simpl.
+    lookup_piece_inversion; try discriminate.
+    clear pf1.
+    unfold is_threatened_by in pf2.
+    destruct pf2 as [pos' [piece [pf1 pf2]]].
+    lookup_piece_inversion; try discriminate.
+    inversion pf1; subst.
+    unfold non_pawn_piece_adj in pf2.
+    unfold neighbor_adj in pf2.
+    admit.
+  - rewrite Forall_map.
+    rewrite Forall_forall.
+    intros ? _.
+    unfold pre_opp_to_play_not_in_check; simpl.
+    intros pos pf1 pf2; simpl.
+    lookup_piece_inversion; try discriminate.
+    clear pf1.
+    unfold is_threatened_by in pf2.
+    destruct pf2 as [pos' [piece [pf1 pf2]]].
+    lookup_piece_inversion; try discriminate.
+    inversion pf1; subst.
+    unfold non_pawn_piece_adj in pf2.
+    unfold neighbor_adj in pf2.
+    admit.
+Admitted.
+
+Definition W_oppose_checkmates : list ChessState :=
+  mk_ChessStates
+    W_oppose_pre_checkmates
+    W_oppose_pre_checkmates_correct1
+    W_oppose_pre_checkmates_correct2
+    W_oppose_pre_checkmates_correct3
+    W_oppose_pre_checkmates_correct4.
 
 Lemma W_oppose_checkmates_correct : forall s,
   In s W_oppose_checkmates ->
   atomic_chess_res s = Some (Game.Win White).
 Proof.
+  intros s Hs.
+  unfold atomic_chess_res.
+  apply In_mk_ChessStates_weaken in Hs.
+  unfold W_oppose_pre_checkmates in Hs.
+  rewrite in_flat_map in Hs.
+  destruct Hs as [cfg [pf1 pf2]].
+  destruct (opp_check cfg) eqn:check_type.
+  - rewrite in_map_iff in pf2.
+    destruct pf2 as [i [Hi1 Hi2]].
+    pose proof (s_play := PreChessState_of_ChessState_pre_chess_to_play s).
+    rewrite <- Hi1 in s_play.
+    simpl in s_play; symmetry in s_play.
+    pose proof (s_board := PreChessState_of_ChessState_pre_board s).
+    rewrite <- Hi1 in s_board.
+    unfold pre_board in s_board.
+    symmetry in s_board.
+    destruct enum_chess_moves as [|m _].
+    + destruct Dec.dec as [chk|nchk].
+      * rewrite s_play; auto.
+      * elim nchk.
+        intros bk Hbk.
+        exists (file (edge cfg), i).
+        exists Rook; split.
+        -- rewrite s_board.
+            apply lookup_piece_place_pieces.
+           ++ rewrite s_play.
+              right; right; left; auto.
+           ++ admit.
+        -- rewrite s_board in Hbk.
+           rewrite s_play in Hbk.
+           simpl in Hbk.
+           lookup_piece_inversion; try discriminate.
+           right; split; [reflexivity|].
+           intros p Hp1 Hp2.
+           apply ListUtil.not_Some_None.
+           intros pos Hpos.
+           rewrite s_board in Hpos.
+           simpl in Hpos.
+           lookup_piece_inversion.
+           ++ symmetry in Hp1.
+              admit.
+           ++ destruct Hp2; lia.
+           ++ simpl in Hp2; destruct Hp2; lia.
+           ++ discriminate.
+    + destruct m as [r].
+      pose proof (pf := dest_orig_neq r).
+      destruct r as [m []].
+      simpl in pf.
+      rewrite s_play in *.
+      rewrite s_board in *.
+      simpl in origin_lookup.
+      lookup_piece_inversion; try discriminate.
+      inversion origin_lookup as [Hking].
+      rewrite <- Hking in origin_dest_adj.
+      simpl in origin_dest_adj.
+      unfold neighbor_adj in origin_dest_adj.
+      admit. (* neighborhood inversion *)
+  - admit. (* horiz *)
 Admitted.
 
 Lemma W_oppose_checkmates_mat :
   Forall (material_eq KRvK) W_oppose_checkmates.
 Proof.
+  rewrite Forall_forall.
+  intros s Hs.
+  apply In_mk_ChessStates_weaken in Hs.
+  unfold W_oppose_pre_checkmates in Hs.
+  rewrite in_flat_map in Hs.
+  destruct Hs as [cfg [pf1 pf2]].
+  destruct (opp_check cfg).
+  - rewrite in_map_iff in pf2.
+    destruct pf2 as [i [Hi1 Hi2]].
+    unfold material_eq.
+    rewrite <- PreChessState_of_ChessState_pre_board.
+    rewrite <- Hi1.
+    unfold pre_board.
+    intros.
+    rewrite count_place_pieces.
+    + destruct c; destruct p; reflexivity.
+    + simpl.
+      admit.
+  - rewrite in_map_iff in pf2.
+    destruct pf2 as [i [Hi1 Hi2]].
+    unfold material_eq.
+    rewrite <- PreChessState_of_ChessState_pre_board.
+    rewrite <- Hi1.
+    unfold pre_board.
+    intros.
+    rewrite count_place_pieces.
+    + destruct c; destruct p; reflexivity.
+    + simpl.
+      admit.
 Admitted.
 
 Definition W_checkmates : list ChessState :=
