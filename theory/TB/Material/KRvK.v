@@ -1398,6 +1398,83 @@ Proof.
     rewrite lookup_place_eq; auto.
 Qed.
 
+Lemma third_file_neq f : edge_file f ->
+  f <> third_file f.
+Proof.
+  intros pf.
+  unfold third_file.
+  destruct pf; destruct Dec.eq_dec; subst;
+  discriminate.
+Qed.
+
+Ltac split_app :=
+  match goal with
+  | [ H : In ?x (?xs ++ ?ys) |- _ ] =>
+      apply in_app_or in H; destruct H as [H|H]; split_app
+  | _ => idtac
+  end.
+
+Lemma vert_check_edge_file cfg :
+  In cfg oppose_configs ->
+  opp_check cfg = vert ->
+  edge_file (file (edge cfg)).
+Proof.
+  intros pf1 pf2.
+  unfold oppose_configs in pf1.
+  split_app.
+  - rewrite in_map_iff in pf1.
+    destruct pf1 as [r [Hr1 Hr2]].
+    rewrite <- Hr1 in *; simpl edge in *; simpl opp_check in *.
+    now left.
+  - rewrite in_map_iff in pf1.
+    destruct pf1 as [r [Hr1 Hr2]].
+    rewrite <- Hr1 in *; simpl edge in *; simpl opp_check in *.
+    now right.
+  - rewrite in_map_iff in pf1.
+    destruct pf1 as [r [Hr1 Hr2]].
+    rewrite <- Hr1 in *; simpl edge in *; simpl opp_check in *.
+    now left.
+  - rewrite in_map_iff in pf1.
+    destruct pf1 as [r [Hr1 Hr2]].
+    rewrite <- Hr1 in *; simpl edge in *; simpl opp_check in *.
+    now right.
+Qed.
+
+Lemma third_rank_neq r : edge_rank r ->
+  r <> third_rank r.
+Proof.
+  intros pf.
+  unfold third_rank.
+  destruct pf; destruct Dec.eq_dec; subst;
+  discriminate.
+Qed.
+
+Lemma horiz_check_edge_rank cfg :
+  In cfg oppose_configs ->
+  opp_check cfg = horiz ->
+  edge_rank (rank (edge cfg)).
+Proof.
+  intros pf1 pf2.
+  unfold oppose_configs in pf1.
+  split_app.
+  - rewrite in_map_iff in pf1.
+    destruct pf1 as [r [Hr1 Hr2]].
+    rewrite <- Hr1 in *; simpl edge in *; simpl opp_check in *.
+    now left.
+  - rewrite in_map_iff in pf1.
+    destruct pf1 as [r [Hr1 Hr2]].
+    rewrite <- Hr1 in *; simpl edge in *; simpl opp_check in *.
+    now right.
+  - rewrite in_map_iff in pf1.
+    destruct pf1 as [r [Hr1 Hr2]].
+    rewrite <- Hr1 in *; simpl edge in *; simpl opp_check in *.
+    now left.
+  - rewrite in_map_iff in pf1.
+    destruct pf1 as [r [Hr1 Hr2]].
+    rewrite <- Hr1 in *; simpl edge in *; simpl opp_check in *.
+    now right.
+Qed.
+
 Lemma W_oppose_pre_checkmates_correct2 :
   Forall pre_lookup_black_king W_oppose_pre_checkmates.
 Proof.
@@ -1413,7 +1490,8 @@ Proof.
     rewrite lookup_place_neq.
     + rewrite lookup_place_eq; auto.
     + apply file_neq; simpl.
-      admit.
+      apply third_file_neq.
+      apply vert_check_edge_file; auto.
   - rewrite Forall_map.
     rewrite Forall_forall.
     intros ? _.
@@ -1421,8 +1499,9 @@ Proof.
     rewrite lookup_place_neq.
     + rewrite lookup_place_eq; auto.
     + apply rank_neq; simpl.
-      admit.
-Admitted.
+      apply third_rank_neq.
+      apply horiz_check_edge_rank; auto.
+Qed.
 
 Lemma W_oppose_pre_checkmates_correct3 :
   Forall pre_kings_unique W_oppose_pre_checkmates.
@@ -1456,6 +1535,20 @@ Proof.
       (reflexivity || discriminate).
 Qed.
 
+Lemma dist_third_file f :
+  edge_file f ->
+  file_dist f (third_file f) = 2.
+Proof.
+  intros [|]; subst; auto.
+Qed.
+
+Lemma dist_third_rank r :
+  edge_rank r ->
+  rank_dist r (third_rank r) = 2.
+Proof.
+  intros [|]; subst; auto.
+Qed.
+
 Lemma W_oppose_pre_checkmates_correct4 :
   Forall pre_opp_to_play_not_in_check W_oppose_pre_checkmates.
 Proof.
@@ -1475,9 +1568,9 @@ Proof.
     destruct pf2 as [pos' [piece [pf1 pf2]]].
     lookup_piece_inversion; try discriminate.
     inversion pf1; subst.
-    unfold non_pawn_piece_adj in pf2.
-    unfold neighbor_adj in pf2.
-    admit.
+    destruct pf2 as [_ pf2]; simpl in pf2.
+    rewrite dist_third_file in pf2; [lia|].
+    apply vert_check_edge_file; auto.
   - rewrite Forall_map.
     rewrite Forall_forall.
     intros ? _.
@@ -1489,10 +1582,72 @@ Proof.
     destruct pf2 as [pos' [piece [pf1 pf2]]].
     lookup_piece_inversion; try discriminate.
     inversion pf1; subst.
-    unfold non_pawn_piece_adj in pf2.
-    unfold neighbor_adj in pf2.
-    admit.
-Admitted.
+    destruct pf2 as [pf2 _]; simpl in pf2.
+    rewrite dist_third_rank in pf2; [lia|].
+    apply horiz_check_edge_rank; auto.
+Qed.
+
+Lemma NoDup_opp_cfg_rank cfg i :
+  opp_check cfg = horiz ->
+  In cfg oppose_configs ->
+  In i (at_least_two_away (file (edge cfg))) ->
+  NoDup
+    [(file (edge cfg), third_file (rank (edge cfg)));
+   edge cfg; (i, rank (edge cfg))].
+Proof.
+  intros pf1 pf2 pf3.
+  repeat constructor.
+  - intros [pf4|[pf4|[]]].
+    + symmetry in pf4.
+      apply f_equal with (f := rank) in pf4.
+      simpl in pf4; symmetry in pf4.
+      apply third_file_neq in pf4; auto.
+      apply horiz_check_edge_rank; auto.
+    + symmetry in pf4.
+      apply f_equal with (f := rank) in pf4.
+      simpl in pf4; symmetry in pf4.
+      apply third_rank_neq in pf4; auto.
+      apply horiz_check_edge_rank; auto.
+  - intros [pf4|[]].
+    apply f_equal with (f := file) in pf4.
+    simpl in pf4.
+    rewrite <- pf4 in pf3.
+    apply In_at_least_two_away in pf3.
+    rewrite fin_dist_refl in pf3.
+    lia.
+  - intros [].
+Qed.
+
+Lemma NoDup_opp_cfg_file cfg i :
+  opp_check cfg = vert ->
+  In cfg oppose_configs ->
+  In i (at_least_two_away (rank (edge cfg))) ->
+  NoDup
+    [(third_file (file (edge cfg)), rank (edge cfg));
+     edge cfg; (file (edge cfg), i)].
+Proof.
+  intros pf1 pf2 pf3.
+  repeat constructor.
+  - intros [pf4|[pf4|[]]].
+    + symmetry in pf4.
+      apply f_equal with (f := file) in pf4.
+      simpl in pf4; symmetry in pf4.
+      apply third_file_neq in pf4; auto.
+      apply vert_check_edge_file; auto.
+    + symmetry in pf4.
+      apply f_equal with (f := file) in pf4.
+      simpl in pf4; symmetry in pf4.
+      apply third_file_neq in pf4; auto.
+      apply vert_check_edge_file; auto.
+  - intros [pf4|[]].
+    apply f_equal with (f := rank) in pf4.
+    simpl in pf4.
+    rewrite <- pf4 in pf3.
+    apply In_at_least_two_away in pf3.
+    rewrite fin_dist_refl in pf3.
+    lia.
+  - intros [].
+Qed.
 
 Definition W_oppose_checkmates : list ChessState :=
   mk_ChessStates
@@ -1501,6 +1656,104 @@ Definition W_oppose_checkmates : list ChessState :=
     W_oppose_pre_checkmates_correct2
     W_oppose_pre_checkmates_correct3
     W_oppose_pre_checkmates_correct4.
+
+Lemma dist_2_second_file f f' :
+  edge_file f ->
+  file_dist f f' = 1 ->
+  f' = second_file f.
+Proof.
+  unfold second_file.
+  intros [pf1|pf1] pf2.
+  - destruct Dec.eq_dec; [|contradiction].
+    rewrite pf1 in *.
+    apply val_inj.
+    simpl val at 2.
+    unfold file_dist, fin_dist in pf2.
+    rewrite Dist.dist_sym in pf2.
+    rewrite StateAction.dist_sub in pf2.
+    + simpl val at 2 in pf2; lia.
+    + simpl val at 1; lia.
+  - destruct Dec.eq_dec as [pf3|pf3].
+    + rewrite pf1 in pf3; discriminate.
+    + apply val_inj.
+      simpl val at 2.
+      unfold file_dist, fin_dist in pf2.
+      rewrite pf1 in pf2.
+      simpl val at 1 in pf2.
+      rewrite StateAction.dist_sub in pf2.
+      * lia.
+      * pose proof (val_bound f'); lia.
+Qed.
+
+Lemma dist_2_second_rank r r' :
+  edge_rank r ->
+  rank_dist r r' = 1 ->
+  r' = second_rank r.
+Proof.
+  unfold second_rank.
+  intros [pf1|pf1] pf2.
+  - destruct Dec.eq_dec; [|contradiction].
+    rewrite pf1 in *.
+    apply val_inj.
+    simpl val at 2.
+    unfold rank_dist, fin_dist in pf2.
+    rewrite Dist.dist_sym in pf2.
+    rewrite StateAction.dist_sub in pf2.
+    + simpl val at 2 in pf2; lia.
+    + simpl val at 1; lia.
+  - destruct Dec.eq_dec as [pf3|pf3].
+    + rewrite pf1 in pf3; discriminate.
+    + apply val_inj.
+      simpl val at 2.
+      unfold rank_dist, fin_dist in pf2.
+      rewrite pf1 in pf2.
+      simpl val at 1 in pf2.
+      rewrite StateAction.dist_sub in pf2.
+      * lia.
+      * pose proof (val_bound r'); lia.
+Qed.
+
+Lemma dist_third_file_1 f f' :
+  edge_file f ->
+  file_dist f f' = 1 ->
+  file_dist (third_file f) f' = 1.
+Proof.
+  intros pf1 pf2.
+  apply dist_2_second_file in pf2; auto.
+  rewrite pf2.
+  destruct pf1 as [pf1|pf1]; rewrite pf1; auto.
+Qed.
+
+Lemma dist_third_rank_1 r r' :
+  edge_rank r ->
+  rank_dist r r' = 1 ->
+  rank_dist (third_rank r) r' = 1.
+Proof.
+  intros pf1 pf2.
+  apply dist_2_second_rank in pf2; auto.
+  rewrite pf2.
+  destruct pf1 as [pf1|pf1]; rewrite pf1; auto.
+Qed.
+
+Lemma third_second_file_neq f :
+  edge_file f ->
+  third_file f <> second_file f.
+Proof.
+  intros.
+  unfold third_file.
+  unfold second_file.
+  destruct Dec.eq_dec; discriminate.
+Qed.
+
+Lemma third_second_rank_neq r :
+  edge_rank r ->
+  third_rank r <> second_rank r.
+Proof.
+  intros.
+  unfold third_rank.
+  unfold second_rank.
+  destruct Dec.eq_dec; discriminate.
+Qed.
 
 Lemma W_oppose_checkmates_correct : forall s,
   In s W_oppose_checkmates ->
@@ -1533,7 +1786,7 @@ Proof.
             apply lookup_piece_place_pieces.
            ++ rewrite s_play.
               right; right; left; auto.
-           ++ admit.
+           ++ apply NoDup_opp_cfg_file; auto.
         -- rewrite s_board in Hbk.
            rewrite s_play in Hbk.
            simpl in Hbk.
@@ -1545,8 +1798,8 @@ Proof.
            rewrite s_board in Hpos.
            simpl in Hpos.
            lookup_piece_inversion.
-           ++ symmetry in Hp1.
-              admit.
+           ++ apply third_file_neq in Hp1; auto.
+              apply vert_check_edge_file; auto.
            ++ destruct Hp2; lia.
            ++ simpl in Hp2; destruct Hp2; lia.
            ++ discriminate.
@@ -1562,9 +1815,198 @@ Proof.
       rewrite <- Hking in origin_dest_adj.
       simpl in origin_dest_adj.
       unfold neighbor_adj in origin_dest_adj.
-      admit. (* neighborhood inversion *)
-  - admit. (* horiz *)
-Admitted.
+      destruct origin_dest_adj as [pf_r pf_f].
+      rewrite Nat.le_1_r in pf_f.
+      destruct pf_f as [f_0|f_1].
+      * elim (no_resulting_check (dest m)).
+        -- unfold updated_board.
+           rewrite lookup_clear_neq; [|congruence].
+           rewrite lookup_place_eq.
+           congruence.
+        -- exists (file (edge cfg), i), Rook; split.
+           ++ unfold updated_board.
+              rewrite lookup_clear_neq.
+              ** rewrite lookup_place_neq.
+                 --- rewrite s_board.
+                     apply lookup_piece_place_pieces.
+                     +++ right; right; now left.
+                     +++ apply NoDup_opp_cfg_file; auto.
+                 --- apply rank_neq; simpl.
+                     intro Hi.
+                     rewrite <- Hi in pf_r.
+                     apply In_at_least_two_away in Hi2.
+                     unfold rank_dist in pf_r; lia.
+              ** rewrite pf2.
+                 apply rank_neq; simpl.
+                 intro Hi.
+                 rewrite <- Hi in Hi2.
+                 apply In_at_least_two_away in Hi2.
+                 rewrite fin_dist_refl in Hi2; lia.
+           ++ right; split.
+              ** unfold vert_preadj.
+                 apply fin_dist_0 in f_0; auto.
+              ** intros p Hp1 Hp2.
+                 apply ListUtil.not_Some_None; intros q Hq.
+                 unfold updated_board in Hq.
+                 rewrite s_board in Hq.
+                 simpl in Hq.
+                 lookup_piece_inversion; try discriminate.
+                 --- apply not_rank_sbetween_right in Hp2; auto.
+                 --- apply third_file_neq in Hp1; auto.
+                     apply vert_check_edge_file; auto.
+                 --- congruence.
+                 --- apply not_rank_sbetween_left in Hp2; auto.
+      * elim (no_resulting_check (dest m)).
+        -- unfold updated_board.
+           rewrite lookup_clear_neq; [|congruence].
+           rewrite lookup_place_eq.
+           congruence.
+        -- exists (third_file (file (edge cfg)),
+            rank (edge cfg)), King; split.
+           ++ unfold updated_board.
+              rewrite lookup_clear_neq.
+              ** rewrite lookup_place_neq.
+                 --- rewrite s_board.
+                     apply lookup_piece_place_pieces.
+                     +++ now left.
+                     +++ apply NoDup_opp_cfg_file; auto.
+                 --- apply file_neq; simpl.
+                     apply dist_2_second_file in f_1;
+                       [|apply vert_check_edge_file; auto].
+                     rewrite f_1.
+                     apply third_second_file_neq.
+                     apply vert_check_edge_file; auto.
+              ** rewrite pf2.
+                 apply file_neq.
+                 apply not_eq_sym.
+                 apply third_file_neq.
+                 apply vert_check_edge_file; auto.
+           ++ split.
+              ** auto.
+              ** simpl.
+                 rewrite dist_third_file_1; auto.
+                 apply vert_check_edge_file; auto.
+  - rewrite in_map_iff in pf2.
+    destruct pf2 as [i [Hi1 Hi2]].
+    pose proof (s_play := PreChessState_of_ChessState_pre_chess_to_play s).
+    rewrite <- Hi1 in s_play.
+    simpl in s_play; symmetry in s_play.
+    pose proof (s_board := PreChessState_of_ChessState_pre_board s).
+    rewrite <- Hi1 in s_board.
+    unfold pre_board in s_board.
+    symmetry in s_board.
+    destruct enum_chess_moves as [|m _].
+    + destruct Dec.dec as [chk|nchk].
+      * rewrite s_play; auto.
+      * elim nchk.
+        intros bk Hbk.
+        exists (i, rank (edge cfg)).
+        exists Rook; split.
+        -- rewrite s_board.
+            apply lookup_piece_place_pieces.
+           ++ rewrite s_play.
+              right; right; left; auto.
+           ++ apply NoDup_opp_cfg_rank; auto.
+        -- rewrite s_board in Hbk.
+           rewrite s_play in Hbk.
+           simpl in Hbk.
+           lookup_piece_inversion; try discriminate.
+           left; split; [reflexivity|].
+           intros p Hp1 Hp2.
+           apply ListUtil.not_Some_None.
+           intros pos Hpos.
+           rewrite s_board in Hpos.
+           simpl in Hpos.
+           lookup_piece_inversion.
+           ++ apply third_rank_neq in Hp1; auto.
+              apply horiz_check_edge_rank; auto.
+           ++ destruct Hp2; lia.
+           ++ simpl in Hp2; destruct Hp2; lia.
+           ++ discriminate.
+    + destruct m as [r].
+      pose proof (pf := dest_orig_neq r).
+      destruct r as [m []].
+      simpl in pf.
+      rewrite s_play in *.
+      rewrite s_board in *.
+      simpl in origin_lookup.
+      lookup_piece_inversion; try discriminate.
+      inversion origin_lookup as [Hking].
+      rewrite <- Hking in origin_dest_adj.
+      simpl in origin_dest_adj.
+      unfold neighbor_adj in origin_dest_adj.
+      destruct origin_dest_adj as [pf_r pf_f].
+      rewrite Nat.le_1_r in pf_r.
+      destruct pf_r as [r_0|r_1].
+      * elim (no_resulting_check (dest m)).
+        -- unfold updated_board.
+           rewrite lookup_clear_neq; [|congruence].
+           rewrite lookup_place_eq.
+           congruence.
+        -- exists (i, rank (edge cfg)), Rook; split.
+           ++ unfold updated_board.
+              rewrite lookup_clear_neq.
+              ** rewrite lookup_place_neq.
+                 --- rewrite s_board.
+                     apply lookup_piece_place_pieces.
+                     +++ right; right; now left.
+                     +++ apply NoDup_opp_cfg_rank; auto.
+                 --- apply file_neq; simpl.
+                     intro Hi.
+                     rewrite <- Hi in pf_f.
+                     apply In_at_least_two_away in Hi2.
+                     unfold file_dist in pf_f; lia.
+              ** rewrite pf2.
+                 apply file_neq; simpl.
+                 intro Hi.
+                 rewrite <- Hi in Hi2.
+                 apply In_at_least_two_away in Hi2.
+                 rewrite fin_dist_refl in Hi2; lia.
+           ++ left; split.
+              ** unfold horiz_preadj.
+                 apply fin_dist_0 in r_0; auto.
+              ** intros p Hp1 Hp2.
+                 apply ListUtil.not_Some_None; intros q Hq.
+                 unfold updated_board in Hq.
+                 rewrite s_board in Hq.
+                 simpl in Hq.
+                 lookup_piece_inversion; try discriminate.
+                 --- apply not_file_sbetween_right in Hp2; auto.
+                 --- apply third_rank_neq in Hp1; auto.
+                     apply horiz_check_edge_rank; auto.
+                 --- congruence.
+                 --- apply not_file_sbetween_left in Hp2; auto.
+      * elim (no_resulting_check (dest m)).
+        -- unfold updated_board.
+           rewrite lookup_clear_neq; [|congruence].
+           rewrite lookup_place_eq.
+           congruence.
+        -- exists (file (edge cfg),
+           third_rank (rank (edge cfg))), King; split.
+           ++ unfold updated_board.
+              rewrite lookup_clear_neq.
+              ** rewrite lookup_place_neq.
+                 --- rewrite s_board.
+                     apply lookup_piece_place_pieces.
+                     +++ now left.
+                     +++ apply NoDup_opp_cfg_rank; auto.
+                 --- apply rank_neq; simpl.
+                     apply dist_2_second_rank in r_1;
+                       [|apply horiz_check_edge_rank; auto].
+                     rewrite r_1.
+                     apply third_second_rank_neq.
+                     apply horiz_check_edge_rank; auto.
+              ** rewrite pf2.
+                 apply rank_neq.
+                 apply not_eq_sym.
+                 apply third_rank_neq.
+                 apply horiz_check_edge_rank; auto.
+           ++ split.
+              ** simpl.
+                 rewrite dist_third_rank_1; auto.
+                 apply horiz_check_edge_rank; auto.
+              ** auto.
+Qed.
 
 Lemma W_oppose_checkmates_mat :
   Forall (material_eq KRvK) W_oppose_checkmates.
@@ -1575,7 +2017,7 @@ Proof.
   unfold W_oppose_pre_checkmates in Hs.
   rewrite in_flat_map in Hs.
   destruct Hs as [cfg [pf1 pf2]].
-  destruct (opp_check cfg).
+  destruct (opp_check cfg) eqn:?.
   - rewrite in_map_iff in pf2.
     destruct pf2 as [i [Hi1 Hi2]].
     unfold material_eq.
@@ -1585,8 +2027,7 @@ Proof.
     intros.
     rewrite count_place_pieces.
     + destruct c; destruct p; reflexivity.
-    + simpl.
-      admit.
+    + apply NoDup_opp_cfg_file; auto.
   - rewrite in_map_iff in pf2.
     destruct pf2 as [i [Hi1 Hi2]].
     unfold material_eq.
@@ -1596,9 +2037,8 @@ Proof.
     intros.
     rewrite count_place_pieces.
     + destruct c; destruct p; reflexivity.
-    + simpl.
-      admit.
-Admitted.
+    + apply NoDup_opp_cfg_rank; auto.
+Qed.
 
 Definition W_checkmates : list ChessState :=
   W_corner_checkmates ++ W_oppose_checkmates.
