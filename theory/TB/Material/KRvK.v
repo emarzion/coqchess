@@ -439,6 +439,19 @@ Proof.
       eapply IHl; eauto.
 Qed.
 
+Lemma In_mk_ChessStates_strengthen (s : ChessState)
+  (l : list PreChessState) pf1 pf2 pf3 pf4 :
+  In (PreChessState_of_ChessState s) l ->
+  In s (mk_ChessStates l pf1 pf2 pf3 pf4).
+Proof.
+  induction l; intro pf; simpl in *.
+  - destruct pf.
+  - destruct pf as [pf|pf].
+    + left; apply StateAction.state_ext;
+        simpl; rewrite pf; auto.
+    + right; apply IHl; auto.
+Qed.
+
 Lemma PreChessState_of_ChessState_pre_board s :
   pre_board (PreChessState_of_ChessState s) =
   board s.
@@ -451,6 +464,22 @@ Lemma PreChessState_of_ChessState_pre_chess_to_play s :
   chess_to_play s.
 Proof.
   reflexivity.
+Qed.
+
+Lemma lookup_piece_place_pieces_Some l : forall p pos,
+  In (p, pos) l ->
+  exists p', lookup_piece pos (place_pieces l) = Some p'.
+Proof.
+  induction l as [|[[c' p'] pos'] l']; intros [c p] pos pf1.
+  - destruct pf1.
+  - destruct pf1 as [pf1|pf1]; simpl.
+    + inversion pf1.
+      rewrite lookup_place_eq; eexists; eauto.
+    + destruct (Dec.eq_dec pos pos').
+      * subst.
+        rewrite lookup_place_eq; eexists; eauto.
+      * rewrite lookup_place_neq; auto.
+        apply IHl' with (p := (c, p)); auto.
 Qed.
 
 Lemma lookup_piece_place_pieces l : forall p pos,
@@ -484,6 +513,17 @@ Proof.
   destruct pf as [_ pf].
   destruct le_dec; auto.
   discriminate.
+Qed.
+
+Lemma at_least_two_away_In {n} : forall (i j : Fin n),
+  2 <= fin_dist i j ->
+  In j (at_least_two_away i).
+Proof.
+  intros i j pf.
+  unfold at_least_two_away.
+  rewrite filter_In.
+  split; [apply all_fin_In|].
+  destruct le_dec; auto.
 Qed.
 
 Lemma fin_dist_refl {n} (i : Fin n) :
@@ -1362,7 +1402,7 @@ Proof.
       |}.
   - refine (map (fun i => _) (at_least_two_away (file (edge cfg)))).
     pose (bk := edge cfg).
-    pose (wk := (file (edge cfg), third_file (rank (edge cfg)))).
+    pose (wk := (file (edge cfg), third_rank (rank (edge cfg)))).
     pose (wr := (i, rank (edge cfg))).
     pose (b :=
       place_pieces [
@@ -2054,11 +2094,629 @@ Proof.
   - apply W_oppose_checkmates_correct; auto.
 Qed.
 
+Lemma PreChessState_ext : forall s s',
+  pre_chess_to_play s = pre_chess_to_play s' ->
+  pre_board s = pre_board s' ->
+  pre_white_king s = pre_white_king s' ->
+  pre_black_king s = pre_black_king s' ->
+  s = s'.
+Proof.
+  intros.
+  destruct s, s'; simpl in *.
+  congruence.
+Qed.
+
+Lemma horiz_checkmate_edge_rank : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  enum_chess_moves s = [] ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  horiz_adj (board s) pos (black_king s) ->
+  edge_rank (rank (black_king s)).
+Proof.
+Admitted.
+
+Lemma vert_checkmate_edge_file : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  enum_chess_moves s = [] ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  vert_adj (board s) pos (black_king s) ->
+  edge_file (file (black_king s)).
+Proof.
+Admitted.
+
+Lemma horiz_checkmate_third_rank : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  enum_chess_moves s = [] ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  horiz_adj (board s) pos (black_king s) ->
+  rank (white_king s) = third_rank (rank (black_king s)).
+Proof.
+Admitted.
+
+Lemma vert_checkmate_third_file : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  enum_chess_moves s = [] ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  vert_adj (board s) pos (black_king s) ->
+  file (white_king s) = third_file (file (black_king s)).
+Proof.
+Admitted.
+
+Lemma horiz_checkmate_opp_or_second_file : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  enum_chess_moves s = [] ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  horiz_adj (board s) pos (black_king s) ->
+  file (white_king s) = file (black_king s) \/
+  (edge_file (file (black_king s)) /\ file (white_king s) = second_file (file (black_king s))).
+Proof.
+Admitted.
+
+Lemma vert_checkmate_opp_or_second_rank : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  enum_chess_moves s = [] ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  vert_adj (board s) pos (black_king s) ->
+  rank (white_king s) = rank (black_king s) \/
+  (edge_rank (rank (black_king s)) /\ rank (white_king s) = second_rank (rank (black_king s))).
+Proof.
+Admitted.
+
+Lemma horiz_checkmate_rook_distant : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  enum_chess_moves s = [] ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  horiz_adj (board s) pos (black_king s) ->
+  2 <= fin_dist (file (black_king s)) (file pos).
+Proof.
+Admitted.
+
+Lemma vert_checkmate_rook_distant : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  enum_chess_moves s = [] ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  vert_adj (board s) pos (black_king s) ->
+  2 <= fin_dist (rank (black_king s)) (rank pos).
+Proof.
+Admitted.
+
+Lemma pre_board_reduce :
+  forall p b wk bk,
+  pre_board {|
+    pre_chess_to_play := p;
+    pre_board := b;
+    pre_white_king := wk;
+    pre_black_king := bk;
+  |} = b.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma lookup_piece_place_piece_Some_inv 
+  pl pc pos pl' pc' pos' b :
+  lookup_piece pos (place_piece pl' pc' pos' b) = Some (pl, pc) ->
+  (pl, pc, pos) = (pl', pc', pos') \/
+  lookup_piece pos b = Some (pl, pc).
+Proof.
+  intro pf.
+  destruct (Dec.eq_dec pos pos').
+  - subst; left.
+    rewrite lookup_place_eq in pf.
+    congruence.
+  - rewrite lookup_place_neq in pf; auto.
+Qed.
+
+Lemma lookup_piece_Some_In ps pos pl pc :
+  lookup_piece pos (place_pieces ps) = Some (pl, pc) ->
+  In (pl, pc, pos) ps.
+Proof.
+  induction ps as [|[[pl' pc'] pos']]; intro pf.
+  - simpl in pf.
+    rewrite lookup_piece_empty in pf.
+    discriminate.
+  - simpl in pf.
+    apply lookup_piece_place_piece_Some_inv in pf.
+    destruct pf.
+    + left; auto.
+    + right; apply IHps; auto.
+Qed.
+
+Lemma list_count_filter {X} `{Dec.Discrete X}
+  (x : X) (l : list X) :
+  list_count x l =
+  List.length (filter (fun x' =>
+    if Dec.eq_dec x x' then true else false) l).
+Proof.
+  induction l as [|y l'].
+  - reflexivity.
+  - simpl.
+    destruct Dec.eq_dec; simpl; congruence.
+Qed.
+
+Lemma filter_map {X Y} (f : X -> Y) (p : Y -> bool) (xs : list X) :
+  filter p (map f xs) =
+  map f (filter (fun x => p (f x)) xs).
+Proof.
+  induction xs.
+  - reflexivity.
+  - simpl.
+    destruct p; simpl; congruence.
+Qed.
+
+Lemma length_lt {X} (xs : list X) : forall ys,
+  NoDup xs ->
+  (forall x, In x xs -> In x ys) ->
+  forall x, ~ In x xs -> In x ys ->
+  length xs < length ys.
+Proof.
+  induction xs as [|x' xs']; intros ys nd_xs pf_inc x x_xs x_ys.
+  - destruct ys.
+    + destruct x_ys.
+    + simpl; lia.
+  - simpl.
+    assert (In x' ys) as x'_ys by
+      (apply pf_inc; now left).
+    destruct (in_split _ _ x'_ys) as [l1 [l2 pf]].
+    rewrite pf.
+    rewrite app_length; simpl.
+    rewrite Nat.add_succ_r.
+    rewrite <- app_length.
+    rewrite <- Nat.succ_lt_mono.
+    apply IHxs' with (x := x).
+    + now inversion nd_xs.
+    + intros y Hy.
+      specialize (pf_inc y (or_intror Hy)).
+      rewrite pf in pf_inc.
+      apply in_or_app.
+      apply in_app_or in pf_inc.
+      destruct pf_inc as [|[pf_eq|]]; auto.
+      inversion nd_xs.
+      elim H1; congruence.
+    + intro; apply x_xs; now right.
+    + rewrite pf in x_ys.
+      apply in_or_app.
+      apply in_app_or in x_ys.
+      destruct x_ys as [|[pf_eq|]]; auto.
+      elim x_xs; now left.
+Qed.
+
+Lemma NoDup_map_inj_on {X Y} (f : X -> Y) :
+  forall (xs : list X),
+  (forall x x' : X, In x xs -> In x' xs -> f x = f x' -> x = x') ->
+  NoDup xs -> NoDup (map f xs).
+Proof.
+  induction xs as [|x ys]; intros Hf nd_xs.
+  - constructor.
+  - simpl; constructor.
+    + intro pf.
+      rewrite in_map_iff in pf.
+      destruct pf as [y [Hy1 Hy2]].
+      inversion nd_xs.
+      apply H1.
+      apply Hf in Hy1.
+      * congruence.
+      * now right.
+      * now left.
+    + apply IHys.
+      * intros; apply Hf; auto.
+        -- now right.
+        -- now right.
+      * now inversion nd_xs.
+Qed.
+
+Lemma list_count_count_le ps b :
+  (forall pl pc p, In (pl, pc, p) ps ->
+    lookup_piece p b = Some (pl, pc)) ->
+  NoDup (map snd ps) ->
+  forall pl pc p,
+    ~ In (pl, pc, p) ps ->
+    lookup_piece p b = Some (pl, pc) ->
+    list_count (pl, pc) (map fst ps) < count pl pc b.
+Proof.
+  intros ps_b nd_ps pl pc pos pos_ps pos_b.
+  rewrite <- MaterialPositions.mp_of_board_count.
+  rewrite list_count_filter.
+  rewrite filter_map.
+  rewrite map_length.
+  rewrite <- map_length with (f := snd).
+  apply length_lt with (x := pos).
+  - apply NoDup_map_inj_on.
+    + intros.
+      rewrite filter_In in *.
+      destruct H as [_ pf1].
+      destruct H0 as [_ pf2].
+      destruct Dec.eq_dec; try discriminate.
+      destruct Dec.eq_dec; try discriminate.
+      destruct x, x'.
+      rewrite pair_equal_spec; split;
+        simpl in *; congruence.
+    + apply NoDup_filter.
+      apply NoDup_map_inv in nd_ps; auto.
+  - intros p pf.
+    apply MaterialPositions.mp_of_board_correct1.
+    unfold lookup_piece in pos_b.
+    rewrite in_map_iff in pf.
+    destruct pf as [[p' pos'] [pf1 pf2]].
+    rewrite filter_In in pf2.
+    destruct pf2 as [pf2 pf3].
+    destruct Dec.eq_dec; try discriminate.
+    apply ps_b; simpl in *; congruence.
+  - intro pf.
+    apply pos_ps.
+    rewrite in_map_iff in pf.
+    destruct pf as [[] [pf1 pf2]].
+    rewrite filter_In in pf2.
+    destruct pf2 as [pf2 pf3].
+    destruct Dec.eq_dec; try discriminate.
+    simpl in *; congruence.
+
+  - apply MaterialPositions.mp_of_board_correct1; auto.
+Qed.
+
+Lemma place_pieces_eq b ps :
+  (forall pl pc p, In (pl, pc, p) ps ->
+    lookup_piece p b = Some (pl, pc)) ->
+  (forall pl pc,
+    count pl pc b = list_count (pl, pc) (map fst ps)) ->
+  NoDup (map snd ps) ->
+  place_pieces ps = b.
+Proof.
+  intros pf1 pf2 pf3.
+  apply Mat.mat_ext.
+  intros pos.
+  fold @lookup_piece.
+  destruct (lookup_piece pos (place_pieces ps))
+    as [[pl pc]|] eqn:Hps.
+  - symmetry; apply pf1.
+    apply lookup_piece_Some_In; auto.
+  - destruct (lookup_piece pos b) 
+      as [[pl pc]|] eqn:Hb; auto.
+    specialize (pf2 pl pc).
+    assert (list_count (pl, pc) (map fst ps) <
+      count pl pc b); [|lia].
+    apply list_count_count_le with (p := pos); auto.
+    intro pf.
+    apply lookup_piece_place_pieces_Some in pf.
+    destruct pf; congruence.
+Qed.
+
+Lemma pos_eta (p : Pos) :
+  p = (file p, rank p).
+Proof.
+  now destruct p.
+Qed.
+
+Ltac destruct_nd :=
+  match goal with
+  | [ |- NoDup _ ] => constructor; destruct_nd
+  | _ => idtac
+  end.
+
 Lemma W_checkmates_correct2 : forall s,
   atomic_chess_res s = Some (Game.Win White) ->
   material_eq KRvK s ->
   In s W_checkmates.
-Admitted.
+Proof.
+  intros s pf1 pf2.
+  unfold atomic_chess_res in pf1.
+  destruct Dec.dec as [chk|];
+  [|destruct enum_chess_moves; discriminate].
+  destruct enum_chess_moves eqn:moves; [|discriminate].
+  inversion pf1 as [s_play]; clear pf1.
+  rewrite <- (opp_invol White) in s_play.
+  apply opp_inj in s_play.
+  unfold in_check in chk.
+  rewrite s_play in chk.
+  specialize (chk (black_king s) (lookup_black_king s)).
+  unfold is_threatened_by in chk.
+  destruct chk as [pos' [piece [pf3 pf4]]].
+  pose proof (mat := pf2).
+  unfold material_eq in pf2.
+  specialize (pf2 White piece).
+  rewrite <- MaterialPositions.mp_of_board_count in pf2.
+  pose proof (pf5 := pf3).
+  apply MaterialPositions.mp_of_board_correct1 in pf5.
+  destruct MaterialPositions.mp_of_board; [destruct pf5|].
+  clear pf5.
+  destruct piece; try discriminate; clear pf2.
+  - apply kings_unique in pf3.
+    rewrite pf3 in pf4.
+    apply neighbor_preadj_kings in pf4.
+    destruct pf4.
+  - unfold W_checkmates.
+    simpl in pf3, s_play.
+    apply in_or_app.
+    destruct pf4 as [h_chk|v_chk].
+    + destruct (horiz_checkmate_opp_or_second_file s pos') as [opp|[corner1 corner2]]; auto.
+      * right; apply In_mk_ChessStates_strengthen.
+        unfold W_oppose_pre_checkmates.
+        rewrite in_flat_map.
+        assert (edge_rank (rank (black_king s))) as r_e by
+            (eapply horiz_checkmate_edge_rank; eauto).
+        exists {|
+          edge := black_king s;
+          opp_check := horiz
+        |}; split.
+        -- apply in_or_app; right.
+           apply in_or_app; right.
+           destruct r_e as [r_e1|r_e8].
+           ++ apply in_or_app; left.
+              rewrite in_map_iff.
+              exists (file (black_king s)).
+              split; [|apply all_fin_In].
+              rewrite <- r_e1.
+              now destruct (black_king s).
+           ++ apply in_or_app; right.
+              rewrite in_map_iff.
+              exists (file (black_king s)).
+              split; [|apply all_fin_In].
+              rewrite <- r_e8.
+              now destruct (black_king s).
+        -- simpl opp_check; rewrite in_map_iff.
+           exists (file pos'); split.
+           ++ apply PreChessState_ext.
+              ** simpl; congruence.
+              ** rewrite pre_board_reduce.
+                 simpl edge.
+                 --- simpl pre_board.
+                     apply place_pieces_eq.
+                     +++ simpl; intros pl pc pos pf.
+                         destruct_or; inversion pf; subst.
+                         *** rewrite <- opp.
+                             erewrite <- horiz_checkmate_third_rank; eauto.
+                             rewrite <- (lookup_white_king s).
+                             now destruct (white_king s).
+                         *** apply s.
+                         *** rewrite <- pf3.
+                             unfold horiz_adj in h_chk.
+                             unfold horiz_preadj in h_chk.
+                             destruct h_chk as [h_chk _].
+                             rewrite <- h_chk.
+                             now destruct pos'.
+                     +++ unfold material_eq in mat.
+                         intros; rewrite mat.
+                         destruct pl, pc; reflexivity.
+                     +++ simpl; destruct_nd; try intros [|].
+                         *** apply (f_equal rank) in H; simpl in H.
+                             apply third_rank_neq in H; auto.
+                         *** destruct H as [|[]].
+                             apply (f_equal rank) in H; simpl in H.
+                             apply third_rank_neq in H; auto.
+                         *** destruct h_chk as [h_chk _].
+                             unfold horiz_preadj in h_chk.
+                             rewrite <- h_chk in H.
+                             rewrite <- pos_eta in H.
+                             rewrite H in pf3.
+                             rewrite lookup_black_king in pf3.
+                             congruence.
+                         *** destruct H.
+                         *** intros [].
+              ** simpl.
+                 rewrite <- opp.
+                 rewrite <- horiz_checkmate_third_rank with (pos := pos'); auto.
+                 now destruct (white_king s).
+              ** reflexivity.
+           ++ apply (@at_least_two_away_In 8).
+              apply horiz_checkmate_rook_distant; auto.
+      * left; apply In_mk_ChessStates_strengthen.
+        unfold W_corner_pre_checkmates.
+        rewrite in_flat_map.
+        exists {|
+          corner := black_king s;
+          off_corner := white_king s;
+          check := horiz
+        |}; split.
+        -- unfold corner_king_configs.
+           assert (edge_rank (rank (black_king s))) as corner3 by
+             (eapply horiz_checkmate_edge_rank; eauto).
+           assert (rank (white_king s) = third_rank (rank (black_king s))) as pf4 by
+             (eapply horiz_checkmate_third_rank; eauto).
+           rewrite (pos_eta (black_king s)).
+           rewrite (pos_eta (white_king s)).
+           rewrite pf4.
+           rewrite corner2.
+           destruct corner1 as [c1|c1]; rewrite c1;
+           destruct corner3 as [c3|c3]; rewrite c3.
+           ++ left; reflexivity.
+           ++ right; right; left; reflexivity.
+           ++ right; right; right; right; left; reflexivity.
+           ++ right; right; right; right; right; right; left; reflexivity.
+        -- simpl check; rewrite in_map_iff.
+           exists (file pos'); split.
+           ++ apply PreChessState_ext.
+              ** simpl; congruence.
+              ** rewrite pre_board_reduce.
+                 simpl edge.
+                 --- simpl pre_board.
+                     apply place_pieces_eq.
+                     +++ simpl; intros pl pc pos pf.
+                         destruct_or; inversion pf; subst.
+                         *** apply s.
+                         *** apply s.
+                         *** unfold horiz_adj in h_chk.
+                             destruct h_chk as [h_chk _].
+                             unfold horiz_preadj in h_chk.
+                             rewrite <- h_chk.
+                             rewrite <- pos_eta; auto.
+                     +++ unfold material_eq in mat.
+                         intros; rewrite mat.
+                         destruct pl, pc; reflexivity.
+                     +++ simpl; destruct_nd; try intros [|].
+                         *** apply (f_equal (fun p =>
+                               lookup_piece p (board s))) in H.
+                             rewrite lookup_black_king in H.
+                             rewrite lookup_white_king in H.
+                             congruence.
+                         *** destruct H as [|[]].
+                             destruct h_chk as [h_chk _].
+                             unfold horiz_preadj in h_chk.
+                             rewrite <- h_chk in H.
+                             rewrite <- pos_eta in H.
+                             rewrite H in pf3.
+                             rewrite lookup_white_king in pf3.
+                             congruence.
+                         *** destruct h_chk as [h_chk _].
+                             unfold horiz_preadj in h_chk.
+                             rewrite <- h_chk in H.
+                             rewrite <- pos_eta in H.
+                             rewrite H in pf3.
+                             rewrite lookup_black_king in pf3.
+                             congruence.
+                         *** destruct H.
+                         *** intros [].
+              ** reflexivity.
+              ** reflexivity.
+           ++ apply (@at_least_two_away_In 8).
+              apply horiz_checkmate_rook_distant; auto.
+    + destruct (vert_checkmate_opp_or_second_rank s pos') as [opp|[corner1 corner2]]; auto.
+      * right; apply In_mk_ChessStates_strengthen.
+        unfold W_oppose_pre_checkmates.
+        rewrite in_flat_map.
+        assert (edge_file (file (black_king s))) as f_e by
+            (eapply vert_checkmate_edge_file; eauto).
+        exists {|
+          edge := black_king s;
+          opp_check := vert
+        |}; split.
+        -- destruct f_e as [f_ea|f_eh].
+           ++ apply in_or_app; left.
+              rewrite in_map_iff.
+              exists (rank (black_king s)).
+              split; [|apply all_fin_In].
+              rewrite <- f_ea.
+              now destruct (black_king s).
+           ++ apply in_or_app; right.
+              apply in_or_app; left.
+              rewrite in_map_iff.
+              exists (rank (black_king s)).
+              split; [|apply all_fin_In].
+              rewrite <- f_eh.
+              now destruct (black_king s).
+        -- simpl opp_check; rewrite in_map_iff.
+           exists (rank pos'); split.
+           ++ apply PreChessState_ext.
+              ** simpl; congruence.
+              ** rewrite pre_board_reduce.
+                 simpl edge.
+                 --- simpl pre_board.
+                     apply place_pieces_eq.
+                     +++ simpl; intros pl pc pos pf.
+                         destruct_or; inversion pf; subst.
+                         *** rewrite <- opp.
+                             erewrite <- vert_checkmate_third_file; eauto.
+                             rewrite <- (lookup_white_king s).
+                             now destruct (white_king s).
+                         *** apply s.
+                         *** rewrite <- pf3.
+                             unfold vert_adj in v_chk.
+                             unfold vert_preadj in v_chk.
+                             destruct v_chk as [v_chk _].
+                             rewrite <- v_chk.
+                             now destruct pos'.
+                     +++ unfold material_eq in mat.
+                         intros; rewrite mat.
+                         destruct pl, pc; reflexivity.
+                     +++ simpl; destruct_nd; try intros [|].
+                         *** apply (f_equal file) in H; simpl in H.
+                             apply third_file_neq in H; auto.
+                         *** destruct H as [|[]].
+                             apply (f_equal file) in H; simpl in H.
+                             apply third_file_neq in H; auto.
+                         *** destruct v_chk as [v_chk _].
+                             unfold vert_preadj in v_chk.
+                             rewrite <- v_chk in H.
+                             rewrite <- pos_eta in H.
+                             rewrite H in pf3.
+                             rewrite lookup_black_king in pf3.
+                             congruence.
+                         *** destruct H.
+                         *** intros [].
+              ** simpl.
+                 rewrite <- opp.
+                 rewrite <- vert_checkmate_third_file with (pos := pos'); auto.
+                 now destruct (white_king s).
+              ** reflexivity.
+           ++ apply (@at_least_two_away_In 8).
+              apply vert_checkmate_rook_distant; auto.
+      * left; apply In_mk_ChessStates_strengthen.
+        unfold W_corner_pre_checkmates.
+        rewrite in_flat_map.
+        exists {|
+          corner := black_king s;
+          off_corner := white_king s;
+          check := vert
+        |}; split.
+        -- unfold corner_king_configs.
+           assert (edge_file (file (black_king s))) as corner3 by
+             (eapply vert_checkmate_edge_file; eauto).
+           assert (file (white_king s) = third_file (file (black_king s))) as pf4 by
+             (eapply vert_checkmate_third_file; eauto).
+           rewrite (pos_eta (black_king s)).
+           rewrite (pos_eta (white_king s)).
+           rewrite pf4.
+           rewrite corner2.
+           destruct corner1 as [c1|c1]; rewrite c1;
+           destruct corner3 as [c3|c3]; rewrite c3.
+           ++ right; left; reflexivity.
+           ++ right; right; right; right; right; left; reflexivity.
+           ++ right; right; right; left; reflexivity.
+           ++ right; right; right; right; right; right; right; left; reflexivity.
+        -- simpl check; rewrite in_map_iff.
+           exists (rank pos'); split.
+           ++ apply PreChessState_ext.
+              ** simpl; congruence.
+              ** rewrite pre_board_reduce.
+                 simpl edge.
+                 --- simpl pre_board.
+                     apply place_pieces_eq.
+                     +++ simpl; intros pl pc pos pf.
+                         destruct_or; inversion pf; subst.
+                         *** apply s.
+                         *** apply s.
+                         *** unfold vert_adj in v_chk.
+                             destruct v_chk as [v_chk _].
+                             unfold vert_preadj in v_chk.
+                             rewrite <- v_chk.
+                             rewrite <- pos_eta; auto.
+                     +++ unfold material_eq in mat.
+                         intros; rewrite mat.
+                         destruct pl, pc; reflexivity.
+                     +++ simpl; destruct_nd; try intros [|].
+                         *** apply (f_equal (fun p =>
+                               lookup_piece p (board s))) in H.
+                             rewrite lookup_black_king in H.
+                             rewrite lookup_white_king in H.
+                             congruence.
+                         *** destruct H as [|[]].
+                             destruct v_chk as [v_chk _].
+                             unfold vert_preadj in v_chk.
+                             rewrite <- v_chk in H.
+                             rewrite <- pos_eta in H.
+                             rewrite H in pf3.
+                             rewrite lookup_white_king in pf3.
+                             congruence.
+                         *** destruct v_chk as [v_chk _].
+                             unfold vert_preadj in v_chk.
+                             rewrite <- v_chk in H.
+                             rewrite <- pos_eta in H.
+                             rewrite H in pf3.
+                             rewrite lookup_black_king in pf3.
+                             congruence.
+                         *** destruct H.
+                         *** intros [].
+              ** reflexivity.
+              ** reflexivity.
+           ++ apply (@at_least_two_away_In 8).
+              apply vert_checkmate_rook_distant; auto.
+Qed.
 
 Lemma W_checkmates_correct3 :
   Forall (material_eq KRvK) W_checkmates.
