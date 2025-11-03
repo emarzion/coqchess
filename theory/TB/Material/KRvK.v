@@ -2106,6 +2106,101 @@ Proof.
   congruence.
 Qed.
 
+Lemma edge_rank_dec (r : Rank) :
+  edge_rank r \/ ~ edge_rank r.
+Proof.
+Admitted.
+
+Lemma edge_file_dec (f : File) :
+  edge_file f \/ ~ edge_file f.
+Proof.
+Admitted.
+
+Definition rank_one_up (r : Rank) : Rank.
+Admitted.
+
+Definition file_one_right (f : File) : File.
+Admitted.
+
+Definition rank_one_down (r : Rank) : Rank.
+Admitted.
+
+Definition file_one_left (f : File) : File.
+Admitted.
+
+Lemma rank_one_up_dist (r : Rank) :
+  ~ edge_rank r ->
+  rank_dist r (rank_one_up r) = 1.
+Proof.
+Admitted.
+
+Lemma file_one_right_dist (f : File) :
+  ~ edge_file f ->
+  file_dist f (file_one_right f) = 1.
+Proof.
+Admitted.
+
+Lemma rank_one_down_dist (r : Rank) :
+  ~ edge_rank r ->
+  rank_dist r (rank_one_down r) = 1.
+Proof.
+Admitted.
+
+Lemma file_one_left_dist (f : File) :
+  ~ edge_file f ->
+  file_dist f (file_one_left f) = 1.
+Proof.
+Admitted.
+
+Lemma rank_up_down (r : Rank) :
+  ~ edge_rank r -> forall r',
+  rank_dist r' (rank_one_up r) <= 1 ->
+  rank_dist r' (rank_one_down r) <= 1 ->
+  r' = r.
+Proof.
+Admitted.
+
+Lemma file_right_left (f : File) :
+  ~ edge_file f -> forall f',
+  file_dist f' (file_one_right f) <= 1 ->
+  file_dist f' (file_one_left f) <= 1 ->
+  f' = f.
+Proof.
+Admitted.
+
+Lemma kings_do_not_touch s :
+  ~ neighbor_preadj (black_king s) (white_king s).
+Proof.
+Admitted.
+
+Lemma neighbor_preadj_dec p p' :
+  neighbor_preadj p p' \/
+  ~ neighbor_preadj p p'.
+Proof.
+Admitted.
+
+Lemma KRvK_black_inv s pos p :
+  material_eq KRvK s ->
+  lookup_piece pos (board s) = Some (Black, p) ->
+  p = King.
+Proof.
+Admitted.
+
+Lemma KRvK_white_inv s pos pos' p :
+  material_eq KRvK s ->
+  lookup_piece pos (board s) = Some (White, p) ->
+  lookup_piece pos' (board s) = Some (White, Rook) ->
+  p = King \/
+  (p = Rook /\ pos = pos').
+Proof.
+Admitted.
+
+Lemma pos_eta (p : Pos) :
+  p = (file p, rank p).
+Proof.
+  now destruct p.
+Qed.
+
 Lemma horiz_checkmate_edge_rank : forall s pos,
   material_eq KRvK s ->
   chess_to_play s = Black ->
@@ -2114,7 +2209,163 @@ Lemma horiz_checkmate_edge_rank : forall s pos,
   horiz_adj (board s) pos (black_king s) ->
   edge_rank (rank (black_king s)).
 Proof.
-Admitted.
+  intros s pos s_mat s_play s_moves s_rook h_chk.
+  destruct (edge_rank_dec (rank (black_king s)))
+    as [|not_er]; auto.
+  exfalso.
+  pose (up :=
+    (file (black_king s),
+    rank_one_up (rank (black_king s))) : Pos).
+  pose (down :=
+    (file (black_king s),
+    rank_one_down (rank (black_king s))) : Pos).
+  assert (neighbor_preadj (white_king s) up) as Hup.
+  { destruct (neighbor_preadj_dec (white_king s) up); auto.
+    assert (ChessMove s) as m.
+    { constructor.
+      unshelve econstructor; [
+      exact {|
+        piece := King;
+        origin := black_king s;
+        dest := up;
+      |}|].
+      split.
+      - rewrite s_play; apply s.
+      - simpl.
+        unfold open.
+        rewrite s_play.
+        destruct (lookup_piece up (board s))
+          as [[[|] ?]|] eqn:Hup; auto.
+        assert (p = King) as Hp by (eapply KRvK_black_inv; eauto).
+        rewrite Hp in Hup.
+        apply s in Hup.
+        apply (f_equal rank) in Hup; simpl in Hup.
+        apply rank_one_up_dist in not_er.
+        rewrite Hup in not_er.
+        unfold rank_dist in not_er.
+        rewrite fin_dist_refl in not_er; lia.
+      - simpl; split.
+        + unfold up; simpl.
+          rewrite rank_one_up_dist; auto.
+        + unfold up; simpl.
+          unfold file_dist.
+          rewrite fin_dist_refl; lia.
+      - intros p pf; simpl in *.
+        lookup_piece_inversion.
+        + discriminate.
+        + intros [pos' [pc' [pf2 pf3]]].
+          lookup_piece_inversion.
+          * discriminate.
+          * inversion pf2.
+            apply (opp_no_fp (chess_to_play s)); auto.
+          * rewrite s_play in pf2.
+            destruct (KRvK_white_inv _ _ _ _ s_mat pf2 s_rook) as [pf6|[pf6 pf7]]; subst.
+            -- unfold non_pawn_piece_adj in pf3.
+               unfold neighbor_adj in pf3.
+               apply s in pf2; subst.
+               contradiction.
+            -- destruct h_chk as [h_chk _].
+               destruct pf3 as [[pf3 _]|[pf3 _]].
+               ++ unfold horiz_preadj in *.
+                  rewrite h_chk in pf3.
+                  simpl in pf3.
+                  apply rank_one_up_dist in not_er.
+                  rewrite <- pf3 in not_er.
+                  unfold rank_dist in not_er.
+                  rewrite fin_dist_refl in not_er; lia.
+               ++ assert (pos = black_king s).
+                  { apply injective_projections; auto. }
+                  rewrite H0 in pf2.
+                  rewrite lookup_black_king in pf2.
+                  discriminate.
+        + apply s in pf.
+          rewrite s_play in pf.
+          contradiction.
+    }
+    pose proof (enum_chess_moves_all m) as pf.
+    rewrite s_moves in pf.
+    destruct pf.
+  }
+  assert (neighbor_preadj (white_king s) down) as Hdown.
+  { destruct (neighbor_preadj_dec (white_king s) down); auto.
+    assert (ChessMove s) as m.
+    { constructor.
+      unshelve econstructor; [
+      exact {|
+        piece := King;
+        origin := black_king s;
+        dest := down;
+      |}|].
+      split.
+      - rewrite s_play; apply s.
+      - simpl.
+        unfold open.
+        rewrite s_play.
+        destruct (lookup_piece down (board s))
+          as [[[|] ?]|] eqn:Hdown; auto.
+        assert (p = King) as Hp by (eapply KRvK_black_inv; eauto).
+        rewrite Hp in Hdown.
+        apply s in Hdown.
+        apply (f_equal rank) in Hdown; simpl in Hdown.
+        apply rank_one_down_dist in not_er.
+        rewrite Hdown in not_er.
+        unfold rank_dist in not_er.
+        rewrite fin_dist_refl in not_er; lia.
+      - simpl; split.
+        + unfold down; simpl.
+          rewrite rank_one_down_dist; auto.
+        + unfold down; simpl.
+          unfold file_dist.
+          rewrite fin_dist_refl; lia.
+      - intros p pf; simpl in *.
+        lookup_piece_inversion.
+        + discriminate.
+        + intros [pos' [pc' [pf2 pf3]]].
+          lookup_piece_inversion.
+          * discriminate.
+          * inversion pf2.
+            apply (opp_no_fp (chess_to_play s)); auto.
+          * rewrite s_play in pf2.
+            destruct (KRvK_white_inv _ _ _ _ s_mat pf2 s_rook) as [pf6|[pf6 pf7]]; subst.
+            -- unfold non_pawn_piece_adj in pf3.
+               unfold neighbor_adj in pf3.
+               apply s in pf2; subst.
+               contradiction.
+            -- destruct h_chk as [h_chk _].
+               destruct pf3 as [[pf3 _]|[pf3 _]].
+               ++ unfold horiz_preadj in *.
+                  rewrite h_chk in pf3.
+                  simpl in pf3.
+                  apply rank_one_down_dist in not_er.
+                  rewrite <- pf3 in not_er.
+                  unfold rank_dist in not_er.
+                  rewrite fin_dist_refl in not_er; lia.
+               ++ assert (pos = black_king s).
+                  { apply injective_projections; auto. }
+                  rewrite H0 in pf2.
+                  rewrite lookup_black_king in pf2.
+                  discriminate.
+        + apply s in pf.
+          rewrite s_play in pf.
+          contradiction.
+    }
+    pose proof (enum_chess_moves_all m) as pf.
+    rewrite s_moves in pf.
+    destruct pf.
+  }
+  destruct Hup as [up_r up_f].
+  destruct Hdown as [down_r down_f].
+  unfold up, down in *.
+  simpl rank in *; simpl file in *.
+  assert (rank (white_king s) = rank (black_king s)).
+  { apply rank_up_down; auto. }
+  apply (kings_do_not_touch s); split.
+  - rewrite H.
+    unfold rank_dist.
+    rewrite fin_dist_refl; lia.
+  - unfold file_dist.
+    rewrite fin_dist_sym; auto.
+Qed.
 
 Lemma vert_checkmate_edge_file : forall s pos,
   material_eq KRvK s ->
@@ -2124,7 +2375,163 @@ Lemma vert_checkmate_edge_file : forall s pos,
   vert_adj (board s) pos (black_king s) ->
   edge_file (file (black_king s)).
 Proof.
-Admitted.
+  intros s pos s_mat s_play s_moves s_rook v_chk.
+  destruct (edge_file_dec (file (black_king s)))
+    as [|not_ef]; auto.
+  exfalso.
+  pose (right :=
+    (file_one_right (file (black_king s)),
+    rank (black_king s)) : Pos).
+  pose (left :=
+    (file_one_left (file (black_king s)),
+    rank (black_king s)) : Pos).
+  assert (neighbor_preadj (white_king s) right) as Hright.
+  { destruct (neighbor_preadj_dec (white_king s) right); auto.
+    assert (ChessMove s) as m.
+    { constructor.
+      unshelve econstructor; [
+      exact {|
+        piece := King;
+        origin := black_king s;
+        dest := right;
+      |}|].
+      split.
+      - rewrite s_play; apply s.
+      - simpl.
+        unfold open.
+        rewrite s_play.
+        destruct (lookup_piece right (board s))
+          as [[[|] ?]|] eqn:Hright; auto.
+        assert (p = King) as Hp by (eapply KRvK_black_inv; eauto).
+        rewrite Hp in Hright.
+        apply s in Hright.
+        apply (f_equal file) in Hright; simpl in Hright.
+        apply file_one_right_dist in not_ef.
+        rewrite Hright in not_ef.
+        unfold file_dist in not_ef.
+        rewrite fin_dist_refl in not_ef; lia.
+      - simpl; split.
+        + unfold right; simpl.
+          unfold rank_dist.
+          rewrite fin_dist_refl; lia.
+        + unfold right; simpl.
+          rewrite file_one_right_dist; auto.
+      - intros p pf; simpl in *.
+        lookup_piece_inversion.
+        + discriminate.
+        + intros [pos' [pc' [pf2 pf3]]].
+          lookup_piece_inversion.
+          * discriminate.
+          * inversion pf2.
+            apply (opp_no_fp (chess_to_play s)); auto.
+          * rewrite s_play in pf2.
+            destruct (KRvK_white_inv _ _ _ _ s_mat pf2 s_rook) as [pf6|[pf6 pf7]]; subst.
+            -- unfold non_pawn_piece_adj in pf3.
+               unfold neighbor_adj in pf3.
+               apply s in pf2; subst.
+               contradiction.
+            -- destruct v_chk as [v_chk _].
+               destruct pf3 as [[pf3 _]|[pf3 _]].
+               ++ assert (pos = black_king s).
+                  { apply injective_projections; auto. }
+                  rewrite H0 in pf2.
+                  rewrite lookup_black_king in pf2.
+                  discriminate.
+               ++ unfold vert_preadj in *.
+                  rewrite v_chk in pf3.
+                  simpl in pf3.
+                  apply file_one_right_dist in not_ef.
+                  rewrite <- pf3 in not_ef.
+                  unfold file_dist in not_ef.
+                  rewrite fin_dist_refl in not_ef; lia.
+        + apply s in pf.
+          rewrite s_play in pf.
+          contradiction.
+    }
+    pose proof (enum_chess_moves_all m) as pf.
+    rewrite s_moves in pf.
+    destruct pf.
+  }
+  assert (neighbor_preadj (white_king s) left) as Hleft.
+  { destruct (neighbor_preadj_dec (white_king s) left); auto.
+    assert (ChessMove s) as m.
+    { constructor.
+      unshelve econstructor; [
+      exact {|
+        piece := King;
+        origin := black_king s;
+        dest := left;
+      |}|].
+      split.
+      - rewrite s_play; apply s.
+      - simpl.
+        unfold open.
+        rewrite s_play.
+        destruct (lookup_piece left (board s))
+          as [[[|] ?]|] eqn:Hleft; auto.
+        assert (p = King) as Hp by (eapply KRvK_black_inv; eauto).
+        rewrite Hp in Hleft.
+        apply s in Hleft.
+        apply (f_equal file) in Hleft; simpl in Hleft.
+        apply file_one_left_dist in not_ef.
+        rewrite Hleft in not_ef.
+        unfold file_dist in not_ef.
+        rewrite fin_dist_refl in not_ef; lia.
+      - simpl; split.
+        + unfold left; simpl.
+          unfold rank_dist.
+          rewrite fin_dist_refl; lia.
+        + unfold left; simpl.
+          rewrite file_one_left_dist; auto.
+      - intros p pf; simpl in *.
+        lookup_piece_inversion.
+        + discriminate.
+        + intros [pos' [pc' [pf2 pf3]]].
+          lookup_piece_inversion.
+          * discriminate.
+          * inversion pf2.
+            apply (opp_no_fp (chess_to_play s)); auto.
+          * rewrite s_play in pf2.
+            destruct (KRvK_white_inv _ _ _ _ s_mat pf2 s_rook) as [pf6|[pf6 pf7]]; subst.
+            -- unfold non_pawn_piece_adj in pf3.
+               unfold neighbor_adj in pf3.
+               apply s in pf2; subst.
+               contradiction.
+            -- destruct v_chk as [v_chk _].
+               destruct pf3 as [[pf3 _]|[pf3 _]].
+               ++ assert (pos = black_king s).
+                  { apply injective_projections; auto. }
+                  rewrite H0 in pf2.
+                  rewrite lookup_black_king in pf2.
+                  discriminate.
+               ++ unfold vert_preadj in *.
+                  rewrite v_chk in pf3.
+                  simpl in pf3.
+                  apply file_one_left_dist in not_ef.
+                  rewrite <- pf3 in not_ef.
+                  unfold file_dist in not_ef.
+                  rewrite fin_dist_refl in not_ef; lia.
+        + apply s in pf.
+          rewrite s_play in pf.
+          contradiction.
+    }
+    pose proof (enum_chess_moves_all m) as pf.
+    rewrite s_moves in pf.
+    destruct pf.
+  }
+  destruct Hright as [right_r right_f].
+  destruct Hleft as [left_r left_f].
+  unfold right, left in *.
+  simpl rank in *; simpl file in *.
+  assert (file (white_king s) = file (black_king s)).
+  { apply file_right_left; auto. }
+  apply (kings_do_not_touch s); split.
+  - unfold rank_dist.
+    rewrite fin_dist_sym; auto.
+  - rewrite H.
+    unfold file_dist.
+    rewrite fin_dist_refl; lia.
+Qed.
 
 Lemma horiz_checkmate_third_rank : forall s pos,
   material_eq KRvK s ->
@@ -2386,12 +2793,6 @@ Proof.
     intro pf.
     apply lookup_piece_place_pieces_Some in pf.
     destruct pf; congruence.
-Qed.
-
-Lemma pos_eta (p : Pos) :
-  p = (file p, rank p).
-Proof.
-  now destruct p.
 Qed.
 
 Ltac destruct_nd :=
