@@ -2206,6 +2206,24 @@ Lemma is_threatened_by_dec b pos pl :
 Proof.
 Admitted.
 
+Lemma rank_dist_second_rank_inv r r' :
+  edge_rank r ->
+  rank_dist r' (second_rank r)  <= 1 ->
+  r' = third_rank r \/
+  r' = second_rank r \/
+  r' = r.
+Proof.
+Admitted.
+
+Lemma file_dist_second_file_inv f f' :
+  edge_file f ->
+  file_dist f' (second_file f)  <= 1 ->
+  f' = third_file f \/
+  f' = second_file f \/
+  f' = f.
+Proof.
+Admitted.
+
 Lemma checkmate_neighborhood : forall pl s,
   atomic_chess_res s = Some (Game.Win pl) -> forall pos,
   neighbor_adj (board s) (king s (opp pl)) pos ->
@@ -2474,7 +2492,63 @@ Lemma horiz_checkmate_third_rank : forall s pos,
   horiz_adj (board s) pos (black_king s) ->
   rank (white_king s) = third_rank (rank (black_king s)).
 Proof.
-Admitted.
+  intros s p s_mat s_play s_res s_rook h_chk.
+  pose proof (horiz_checkmate_edge_rank
+    s p s_mat s_play s_res s_rook h_chk) as s_e.
+  pose (v :=
+    (file (black_king s), second_rank (rank (black_king s))) : Pos).
+  assert (neighbor_adj (board s) (black_king s) v) as vn.
+  { split; simpl.
+    - rewrite second_rank_dist; auto.
+    - unfold file_dist.
+      rewrite fin_dist_refl; auto.
+  }
+  destruct (checkmate_neighborhood White s s_res v vn) as [thr|cl].
+  - destruct thr as [pos [pc [pf1 pf2]]].
+    lookup_piece_inversion; try discriminate.
+    eapply KRvK_white_inv in pf1; eauto.
+    destruct pf1 as [[? ?]|[? ?]]; subst.
+    + simpl in pf2.
+      destruct pf2 as [pf_r pf_f].
+      apply rank_dist_second_rank_inv in pf_r; auto.
+      destruct pf_r as [|[pf_r|pf_r]]; auto.
+      * elim (kings_do_not_touch s); split.
+        -- rewrite pf_r.
+           rewrite second_rank_dist; auto.
+        -- unfold file_dist in *.
+           rewrite fin_dist_sym; auto.
+      * elim (kings_do_not_touch s); split.
+         -- rewrite pf_r.
+            unfold rank_dist.
+            rewrite fin_dist_refl; auto.
+         -- unfold file_dist.
+            rewrite fin_dist_sym; auto.
+    + destruct h_chk as [h_chk _].
+      destruct pf2 as [pf_h|pf_v].
+      * destruct pf_h as [pf_h _].
+        unfold horiz_preadj in *.
+        simpl in pf_h.
+        rewrite h_chk in pf_h.
+        apply second_rank_dist in s_e.
+        rewrite <- pf_h in s_e.
+        unfold rank_dist in s_e.
+        rewrite fin_dist_refl in s_e.
+        discriminate.
+      * destruct pf_v as [pf_v _].
+        elim pf.
+        apply injective_projections; auto.
+  - unfold open in cl.
+    destruct (lookup_piece v (board s))
+      as [[[|] pc]|] eqn:Hv; try tauto.
+    apply KRvK_black_inv in Hv; auto.
+    destruct Hv as [_ Hv].
+    apply (f_equal rank) in Hv.
+    simpl in Hv.
+    apply second_rank_dist in s_e.
+    rewrite Hv in s_e.
+    unfold rank_dist in s_e.
+    rewrite fin_dist_refl in s_e; discriminate.
+Qed.
 
 Lemma vert_checkmate_third_file : forall s pos,
   material_eq KRvK s ->
@@ -2484,7 +2558,63 @@ Lemma vert_checkmate_third_file : forall s pos,
   vert_adj (board s) pos (black_king s) ->
   file (white_king s) = third_file (file (black_king s)).
 Proof.
-Admitted.
+  intros s p s_mat s_play s_res s_rook v_chk.
+  pose proof (vert_checkmate_edge_file
+    s p s_mat s_play s_res s_rook v_chk) as s_e.
+  pose (h :=
+    (second_file (file (black_king s)), rank (black_king s)) : Pos).
+  assert (neighbor_adj (board s) (black_king s) h) as hn.
+  { split; simpl.
+    - unfold rank_dist.
+      rewrite fin_dist_refl; auto.
+    - rewrite second_file_dist; auto.
+  }
+  destruct (checkmate_neighborhood White s s_res h hn) as [thr|cl].
+  - destruct thr as [pos [pc [pf1 pf2]]].
+    lookup_piece_inversion; try discriminate.
+    eapply KRvK_white_inv in pf1; eauto.
+    destruct pf1 as [[? ?]|[? ?]]; subst.
+    + simpl in pf2.
+      destruct pf2 as [pf_r pf_f].
+      apply file_dist_second_file_inv in pf_f; auto.
+      destruct pf_f as [|[pf_f|pf_f]]; auto.
+      * elim (kings_do_not_touch s); split.
+        -- unfold rank_dist in *.
+           rewrite fin_dist_sym; auto.
+        -- rewrite pf_f.
+           rewrite second_file_dist; auto.
+      * elim (kings_do_not_touch s); split.
+         -- unfold rank_dist.
+            rewrite fin_dist_sym; auto.
+         -- rewrite pf_f.
+            unfold file_dist.
+            rewrite fin_dist_refl; auto.
+    + destruct v_chk as [v_chk _].
+      destruct pf2 as [pf_h|pf_v].
+      * destruct pf_h as [pf_h _].
+        elim pf.
+        apply injective_projections; auto.
+      * destruct pf_v as [pf_v _].
+        unfold vert_preadj in *.
+        simpl in pf_v.
+        rewrite v_chk in pf_v.
+        apply second_file_dist in s_e.
+        rewrite <- pf_v in s_e.
+        unfold file_dist in s_e.
+        rewrite fin_dist_refl in s_e.
+        discriminate.
+  - unfold open in cl.
+    destruct (lookup_piece h (board s))
+      as [[[|] pc]|] eqn:Hh; try tauto.
+    apply KRvK_black_inv in Hh; auto.
+    destruct Hh as [_ Hh].
+    apply (f_equal file) in Hh.
+    simpl in Hh.
+    apply second_file_dist in s_e.
+    rewrite Hh in s_e.
+    unfold file_dist in s_e.
+    rewrite fin_dist_refl in s_e; discriminate.
+Qed.
 
 Lemma horiz_checkmate_opp_or_second_file : forall s pos,
   material_eq KRvK s ->
@@ -2508,6 +2638,18 @@ Lemma vert_checkmate_opp_or_second_rank : forall s pos,
 Proof.
 Admitted.
 
+Lemma rank_dist_sym (r r' : Rank) :
+  rank_dist r r' = rank_dist r' r.
+Proof.
+  apply fin_dist_sym.
+Qed.
+
+Lemma file_dist_sym (f f' : File) :
+  file_dist f f' = file_dist f' f.
+Proof.
+  apply fin_dist_sym.
+Qed.
+
 Lemma horiz_checkmate_rook_distant : forall s pos,
   material_eq KRvK s ->
   chess_to_play s = Black ->
@@ -2516,7 +2658,47 @@ Lemma horiz_checkmate_rook_distant : forall s pos,
   horiz_adj (board s) pos (black_king s) ->
   2 <= fin_dist (file (black_king s)) (file pos).
 Proof.
-Admitted.
+  intros s p s_mat s_play s_res s_rook h_chk.
+  pose proof (horiz_checkmate_edge_rank s p s_mat s_play
+    s_res s_rook h_chk) as s_e.
+  pose proof (horiz_checkmate_third_rank s p s_mat s_play
+    s_res s_rook h_chk) as wk_3rd.
+  assert (forall x, x <> 0 -> x <> 1 -> 2 <= x) as arith_fact by lia.
+  apply arith_fact; clear arith_fact; intro pf.
+  - apply fin_dist_0 in pf.
+    destruct h_chk as [h_chk _].
+    assert (p = black_king s) by (apply injective_projections; auto).
+    subst.
+    rewrite lookup_black_king in s_rook.
+    discriminate.
+  - assert (neighbor_adj (board s) (black_king s) p) as pclose.
+    { split.
+      + destruct h_chk as [h_chk _].
+        unfold horiz_preadj in h_chk.
+        rewrite h_chk.
+        unfold rank_dist.
+        rewrite fin_dist_refl; auto.
+      + unfold file_dist; lia.
+    }
+    destruct (checkmate_neighborhood White s s_res p pclose) as [thr|cl].
+    + destruct thr as [pos [pc [pf1 pf2]]].
+      lookup_piece_inversion; try discriminate.
+      eapply KRvK_white_inv in pf1; eauto.
+      destruct pf1 as [[? ?]|[? ?]]; subst; [|contradiction].
+      destruct pf2 as [pf2 _].
+      rewrite wk_3rd in pf2.
+      rewrite rank_dist_sym in pf2.
+      destruct h_chk as [h_chk _].
+      unfold horiz_preadj in h_chk.
+      rewrite h_chk in pf2.
+      rewrite dist_third_rank in pf2; auto.
+      lia.
+    + unfold open in cl.
+      destruct (lookup_piece p (board s))
+        as [[[|] pc]|] eqn:Hv; try tauto.
+      discriminate.
+Qed.
+
 
 Lemma vert_checkmate_rook_distant : forall s pos,
   material_eq KRvK s ->
@@ -2526,7 +2708,46 @@ Lemma vert_checkmate_rook_distant : forall s pos,
   vert_adj (board s) pos (black_king s) ->
   2 <= fin_dist (rank (black_king s)) (rank pos).
 Proof.
-Admitted.
+  intros s p s_mat s_play s_res s_rook v_chk.
+  pose proof (vert_checkmate_edge_file s p s_mat s_play
+    s_res s_rook v_chk) as s_e.
+  pose proof (vert_checkmate_third_file s p s_mat s_play
+    s_res s_rook v_chk) as wk_3rd.
+  assert (forall x, x <> 0 -> x <> 1 -> 2 <= x) as arith_fact by lia.
+  apply arith_fact; clear arith_fact; intro pf.
+  - apply fin_dist_0 in pf.
+    destruct v_chk as [v_chk _].
+    assert (p = black_king s) by (apply injective_projections; auto).
+    subst.
+    rewrite lookup_black_king in s_rook.
+    discriminate.
+  - assert (neighbor_adj (board s) (black_king s) p) as pclose.
+    { split.
+      + unfold rank_dist; lia.
+      + destruct v_chk as [v_chk _].
+        unfold vert_preadj in v_chk.
+        rewrite v_chk.
+        unfold file_dist.
+        rewrite fin_dist_refl; auto.
+    }
+    destruct (checkmate_neighborhood White s s_res p pclose) as [thr|cl].
+    + destruct thr as [pos [pc [pf1 pf2]]].
+      lookup_piece_inversion; try discriminate.
+      eapply KRvK_white_inv in pf1; eauto.
+      destruct pf1 as [[? ?]|[? ?]]; subst; [|contradiction].
+      destruct pf2 as [_ pf2].
+      rewrite wk_3rd in pf2.
+      rewrite file_dist_sym in pf2.
+      destruct v_chk as [v_chk _].
+      unfold vert_preadj in v_chk.
+      rewrite v_chk in pf2.
+      rewrite dist_third_file in pf2; auto.
+      lia.
+    + unfold open in cl.
+      destruct (lookup_piece p (board s))
+        as [[[|] pc]|] eqn:Hv; try tauto.
+      discriminate.
+Qed.
 
 Lemma pre_board_reduce :
   forall p b wk bk,
