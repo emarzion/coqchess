@@ -2224,6 +2224,22 @@ Lemma file_dist_second_file_inv f f' :
 Proof.
 Admitted.
 
+Lemma rank_dist_edge_rank r r' :
+  edge_rank r ->
+  file_dist r' r <= 1 ->
+  r' = r \/
+  r' = second_rank r.
+Proof.
+Admitted.
+
+Lemma file_dist_edge_file f f' :
+  edge_file f ->
+  file_dist f' f <= 1 ->
+  f' = f \/
+  f' = second_file f.
+Proof.
+Admitted.
+
 Lemma checkmate_neighborhood : forall pl s,
   atomic_chess_res s = Some (Game.Win pl) -> forall pos,
   neighbor_adj (board s) (king s (opp pl)) pos ->
@@ -2616,28 +2632,6 @@ Proof.
     rewrite fin_dist_refl in s_e; discriminate.
 Qed.
 
-Lemma horiz_checkmate_opp_or_second_file : forall s pos,
-  material_eq KRvK s ->
-  chess_to_play s = Black ->
-  atomic_chess_res s = Some (Game.Win White) ->
-  lookup_piece pos (board s) = Some (White, Rook) ->
-  horiz_adj (board s) pos (black_king s) ->
-  file (white_king s) = file (black_king s) \/
-  (edge_file (file (black_king s)) /\ file (white_king s) = second_file (file (black_king s))).
-Proof.
-Admitted.
-
-Lemma vert_checkmate_opp_or_second_rank : forall s pos,
-  material_eq KRvK s ->
-  chess_to_play s = Black ->
-  atomic_chess_res s = Some (Game.Win White) ->
-  lookup_piece pos (board s) = Some (White, Rook) ->
-  vert_adj (board s) pos (black_king s) ->
-  rank (white_king s) = rank (black_king s) \/
-  (edge_rank (rank (black_king s)) /\ rank (white_king s) = second_rank (rank (black_king s))).
-Proof.
-Admitted.
-
 Lemma rank_dist_sym (r r' : Rank) :
   rank_dist r r' = rank_dist r' r.
 Proof.
@@ -2747,6 +2741,286 @@ Proof.
       destruct (lookup_piece p (board s))
         as [[[|] pc]|] eqn:Hv; try tauto.
       discriminate.
+Qed.
+
+Lemma horiz_checkmate_opp_or_second_file : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  atomic_chess_res s = Some (Game.Win White) ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  horiz_adj (board s) pos (black_king s) ->
+  file (white_king s) = file (black_king s) \/
+  (edge_file (file (black_king s)) /\ file (white_king s) = second_file (file (black_king s))).
+Proof.
+  intros s p s_mat s_play s_res s_rook h_chk.
+  pose proof (horiz_checkmate_edge_rank s p s_mat
+    s_play s_res s_rook h_chk) as er.
+  pose proof (horiz_checkmate_rook_distant s p s_mat s_play s_res s_rook h_chk) as rk_dist.
+  destruct (edge_file_dec (file (black_king s))) as [ef|nef].
+  - pose (v :=
+      (file (black_king s), second_rank (rank (black_king s))) : Pos).
+    assert (neighbor_adj (board s) (black_king s) v) as vn.
+    { split; simpl.
+      - rewrite second_rank_dist; auto.
+      - unfold file_dist.
+        rewrite fin_dist_refl; auto.
+    }
+    destruct (checkmate_neighborhood White s s_res v vn) as [thr|cl].
+    + destruct thr as [pos [pc [pf1 pf2]]].
+      lookup_piece_inversion; try discriminate.
+      eapply KRvK_white_inv in pf1; eauto.
+      destruct pf1 as [[? ?]|[? ?]]; subst.
+      * destruct pf2 as [_ pf_f].
+        simpl in pf_f.
+        apply file_dist_edge_file in pf_f; auto.
+        destruct pf_f; [now left|now right].
+      * destruct h_chk as [h_chk _].
+        destruct pf2 as [pf_h|pf_v].
+        -- destruct pf_h as [pf_h _].
+           unfold horiz_preadj in *.
+           simpl in pf_h.
+           rewrite h_chk in pf_h.
+           apply second_rank_dist in er.
+           rewrite <- pf_h in er.
+           unfold rank_dist in er.
+           rewrite fin_dist_refl in er.
+           discriminate.
+        -- destruct pf_v as [pf_v _].
+           elim pf.
+           apply injective_projections; auto.
+    + unfold open in cl.
+      destruct (lookup_piece v (board s))
+        as [[[|] pc]|] eqn:Hv; try tauto.
+      apply KRvK_black_inv in Hv; auto.
+      destruct Hv as [_ Hv].
+      apply (f_equal rank) in Hv.
+      simpl in Hv.
+      apply second_rank_dist in er.
+      rewrite Hv in er.
+      unfold rank_dist in er.
+      rewrite fin_dist_refl in er; discriminate.
+  - left.
+    pose (l := (file_one_left (file (black_king s)),
+      second_rank (rank (black_king s))) : Pos).
+    pose (r := (file_one_right (file (black_king s)),
+      second_rank (rank (black_king s))) : Pos).
+    assert (neighbor_adj (board s) (black_king s) l) as ln.
+    { split.
+      - simpl; rewrite second_rank_dist; auto.
+      - simpl; rewrite file_one_left_dist; auto.
+    }
+    assert (neighbor_adj (board s) (black_king s) r) as rn.
+    { split.
+      - simpl; rewrite second_rank_dist; auto.
+      - simpl; rewrite file_one_right_dist; auto.
+    }
+    destruct (checkmate_neighborhood White s s_res l ln) as [thr|cl].
+    + destruct thr as [pos [pc [pf1 pf2]]].
+      lookup_piece_inversion; try discriminate.
+      eapply KRvK_white_inv in pf1; eauto.
+      destruct pf1 as [[? ?]|[? ?]]; subst.
+      * destruct pf2 as [_ lf]. simpl in lf.
+        destruct (checkmate_neighborhood White s s_res r rn) as [thr|cl].
+        -- destruct thr as [pos [pc [pf1 pf2]]].
+           lookup_piece_inversion; try discriminate.
+           eapply KRvK_white_inv in pf1; eauto.
+           destruct pf1 as [[? ?]|[? ?]]; subst.
+           ++ destruct pf2 as [_ rf]. simpl in rf.
+              apply file_right_left; auto.
+           ++ destruct h_chk as [h_chk _].
+              destruct pf2 as [pf_h|pf_v].
+              ** destruct pf_h as [pf_h _].
+                 unfold horiz_preadj in *.
+                 simpl in pf_h.
+                 rewrite h_chk in pf_h.
+                 apply second_rank_dist in er.
+                 rewrite <- pf_h in er.
+                 unfold rank_dist in er.
+                 rewrite fin_dist_refl in er.
+                 discriminate.
+              ** destruct pf_v as [pf_v _].
+                 unfold vert_preadj in pf_v.
+                 rewrite pf_v in rk_dist.
+                 destruct rn as [_ rn].
+                 unfold file_dist in rn; lia.
+        -- unfold open in cl.
+           destruct (lookup_piece r (board s))
+             as [[[|] pc]|] eqn:Hr; try tauto.
+           apply KRvK_black_inv in Hr; auto.
+           destruct Hr as [_ Hr].
+           apply (f_equal rank) in Hr.
+           simpl in Hr.
+           apply second_rank_dist in er.
+           rewrite Hr in er.
+           unfold rank_dist in er.
+           rewrite fin_dist_refl in er; discriminate.
+      * destruct h_chk as [h_chk _].
+        destruct pf2 as [pf_h|pf_v].
+        -- destruct pf_h as [pf_h _].
+           unfold horiz_preadj in *.
+           simpl in pf_h.
+           rewrite h_chk in pf_h.
+           apply second_rank_dist in er.
+           rewrite <- pf_h in er.
+           unfold rank_dist in er.
+           rewrite fin_dist_refl in er.
+           discriminate.
+        -- destruct pf_v as [pf_v _].
+           unfold vert_preadj in pf_v.
+           rewrite pf_v in rk_dist.
+           destruct ln as [_ ln].
+           unfold file_dist in ln; lia.
+    + unfold open in cl.
+      destruct (lookup_piece l (board s))
+        as [[[|] pc]|] eqn:Hl; try tauto.
+      apply KRvK_black_inv in Hl; auto.
+      destruct Hl as [_ Hl].
+      apply (f_equal rank) in Hl.
+      simpl in Hl.
+      apply second_rank_dist in er.
+      rewrite Hl in er.
+      unfold rank_dist in er.
+      rewrite fin_dist_refl in er; discriminate.
+Qed.
+
+Lemma vert_checkmate_opp_or_second_rank : forall s pos,
+  material_eq KRvK s ->
+  chess_to_play s = Black ->
+  atomic_chess_res s = Some (Game.Win White) ->
+  lookup_piece pos (board s) = Some (White, Rook) ->
+  vert_adj (board s) pos (black_king s) ->
+  rank (white_king s) = rank (black_king s) \/
+  (edge_rank (rank (black_king s)) /\ rank (white_king s) = second_rank (rank (black_king s))).
+Proof.
+  intros s p s_mat s_play s_res s_rook v_chk.
+  pose proof (vert_checkmate_edge_file s p s_mat
+    s_play s_res s_rook v_chk) as ef.
+  pose proof (vert_checkmate_rook_distant s p s_mat s_play s_res s_rook v_chk) as rk_dist.
+  destruct (edge_rank_dec (rank (black_king s))) as [er|ner].
+  - pose (h :=
+      (second_file (file (black_king s)), rank (black_king s)) : Pos).
+    assert (neighbor_adj (board s) (black_king s) h) as hn.
+    { split; simpl.
+      - unfold rank_dist.
+        rewrite fin_dist_refl; auto.
+      - rewrite second_file_dist; auto.
+    }
+    destruct (checkmate_neighborhood White s s_res h hn) as [thr|cl].
+    + destruct thr as [pos [pc [pf1 pf2]]].
+      lookup_piece_inversion; try discriminate.
+      eapply KRvK_white_inv in pf1; eauto.
+      destruct pf1 as [[? ?]|[? ?]]; subst.
+      * destruct pf2 as [pf_r _].
+        simpl in pf_r.
+        apply rank_dist_edge_rank in pf_r; auto.
+        destruct pf_r; [now left|now right].
+      * destruct v_chk as [v_chk _].
+        destruct pf2 as [pf_h|pf_v].
+        -- destruct pf_h as [pf_h _].
+           elim pf.
+           apply injective_projections; auto.
+        -- destruct pf_v as [pf_v _].
+           unfold vert_preadj in *.
+           simpl in pf_v.
+           rewrite v_chk in pf_v.
+           apply second_file_dist in ef.
+           rewrite <- pf_v in ef.
+           unfold file_dist in ef.
+           rewrite fin_dist_refl in ef.
+           discriminate.
+    + unfold open in cl.
+      destruct (lookup_piece h (board s))
+        as [[[|] pc]|] eqn:Hh; try tauto.
+      apply KRvK_black_inv in Hh; auto.
+      destruct Hh as [_ Hh].
+      apply (f_equal file) in Hh.
+      simpl in Hh.
+      apply second_file_dist in ef.
+      rewrite Hh in ef.
+      unfold file_dist in ef.
+      rewrite fin_dist_refl in ef; discriminate.
+  - left.
+    pose (d := (second_file (file (black_king s)),
+      rank_one_down (rank (black_king s))) : Pos).
+    pose (u := (second_file (file (black_king s)),
+      rank_one_up (rank (black_king s))) : Pos).
+    assert (neighbor_adj (board s) (black_king s) d) as dn.
+    { split.
+      - simpl; rewrite rank_one_down_dist; auto.
+      - simpl; rewrite second_file_dist; auto.
+    }
+    assert (neighbor_adj (board s) (black_king s) u) as un.
+    { split.
+      - simpl; rewrite rank_one_up_dist; auto.
+      - simpl; rewrite second_file_dist; auto.
+    }
+    destruct (checkmate_neighborhood White s s_res d dn) as [thr|cl].
+    + destruct thr as [pos [pc [pf1 pf2]]].
+      lookup_piece_inversion; try discriminate.
+      eapply KRvK_white_inv in pf1; eauto.
+      destruct pf1 as [[? ?]|[? ?]]; subst.
+      * destruct pf2 as [dr _]. simpl in dr.
+        destruct (checkmate_neighborhood White s s_res u un) as [thr|cl].
+        -- destruct thr as [pos [pc [pf1 pf2]]].
+           lookup_piece_inversion; try discriminate.
+           eapply KRvK_white_inv in pf1; eauto.
+           destruct pf1 as [[? ?]|[? ?]]; subst.
+           ++ destruct pf2 as [ur _]. simpl in ur.
+              apply rank_up_down; auto.
+           ++ destruct v_chk as [v_chk _].
+              destruct pf2 as [pf_h|pf_v].
+              ** destruct pf_h as [pf_h _].
+                 unfold horiz_preadj in pf_h.
+                 rewrite pf_h in rk_dist.
+                 destruct un as [un _].
+                 unfold rank_dist in un; lia.
+              ** destruct pf_v as [pf_v _].
+                 unfold vert_preadj in *.
+                 simpl in pf_v.
+                 rewrite v_chk in pf_v.
+                 apply second_file_dist in ef.
+                 rewrite <- pf_v in ef.
+                 unfold file_dist in ef.
+                 rewrite fin_dist_refl in ef.
+                 discriminate.
+        -- unfold open in cl.
+           destruct (lookup_piece u (board s))
+             as [[[|] pc]|] eqn:Hu; try tauto.
+           apply KRvK_black_inv in Hu; auto.
+           destruct Hu as [_ Hu].
+           apply (f_equal file) in Hu.
+           simpl in Hu.
+           apply second_file_dist in ef.
+           rewrite Hu in ef.
+           unfold file_dist in ef.
+           rewrite fin_dist_refl in ef; discriminate.
+      * destruct v_chk as [v_chk _].
+        destruct pf2 as [pf_h|pf_v].
+        -- destruct pf_h as [pf_h _].
+           unfold horiz_preadj in pf_h.
+           rewrite pf_h in rk_dist.
+           destruct dn as [dn _].
+           unfold rank_dist in dn; lia.
+        -- destruct pf_v as [pf_v _].
+           unfold vert_preadj in *.
+           simpl in pf_v.
+           rewrite v_chk in pf_v.
+           apply second_file_dist in ef.
+           rewrite <- pf_v in ef.
+           unfold file_dist in ef.
+           rewrite fin_dist_refl in ef.
+           discriminate.
+    + unfold open in cl.
+      destruct (lookup_piece d (board s))
+        as [[[|] pc]|] eqn:Hd; try tauto.
+      apply KRvK_black_inv in Hd; auto.
+      destruct Hd as [_ Hd].
+      apply (f_equal file) in Hd.
+      simpl in Hd.
+      apply second_file_dist in ef.
+      rewrite Hd in ef.
+      unfold file_dist in ef.
+      rewrite fin_dist_refl in ef; discriminate.
 Qed.
 
 Lemma pre_board_reduce :
