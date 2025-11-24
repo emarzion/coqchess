@@ -2109,12 +2109,24 @@ Qed.
 Lemma edge_rank_dec (r : Rank) :
   edge_rank r \/ ~ edge_rank r.
 Proof.
-Admitted.
+  unfold edge_rank.
+  destruct (Dec.eq_dec r rank_1).
+  - left; now left.
+  - destruct (Dec.eq_dec r rank_8).
+    + left; now right.
+    + right; tauto.
+Qed.
 
 Lemma edge_file_dec (f : File) :
   edge_file f \/ ~ edge_file f.
 Proof.
-Admitted.
+  unfold edge_file.
+  destruct (Dec.eq_dec f file_a).
+  - left; now left.
+  - destruct (Dec.eq_dec f file_h).
+    + left; now right.
+    + right; tauto.
+Qed.
 
 Definition rank_one_up (r : Rank) : Rank.
 Admitted.
@@ -2171,20 +2183,45 @@ Admitted.
 Lemma kings_do_not_touch s :
   ~ neighbor_preadj (black_king s) (white_king s).
 Proof.
-Admitted.
+  intro pf.
+  destruct (chess_to_play s) eqn:s_play.
+  - apply (opp_to_play_not_in_check s (black_king s)).
+    + rewrite s_play; apply lookup_black_king.
+    + rewrite s_play.
+      exists (white_king s), King; split.
+      * apply lookup_white_king.
+      * apply neighbor_preadj_sym; auto.
+  - apply (opp_to_play_not_in_check s (white_king s)).
+    + rewrite s_play; apply lookup_white_king.
+    + rewrite s_play.
+      exists (black_king s), King; split.
+      * apply lookup_black_king.
+      * auto.
+Qed.
 
 Lemma neighbor_preadj_dec p p' :
   neighbor_preadj p p' \/
   ~ neighbor_preadj p p'.
 Proof.
-Admitted.
+  unfold neighbor_preadj.
+  destruct (le_dec (rank_dist (rank p) (rank p')) 1); [|tauto].
+  destruct (le_dec (file_dist (file p) (file p')) 1); tauto.
+Qed.
 
 Lemma KRvK_black_inv s pos p :
   material_eq KRvK s ->
   lookup_piece pos (board s) = Some (Black, p) ->
   p = King /\ pos = black_king s.
 Proof.
-Admitted.
+  intros s_mat s_p.
+  specialize (s_mat Black p).
+  rewrite <- MaterialPositions.mp_of_board_count in s_mat.
+  pose proof (MaterialPositions.mp_of_board_correct1 _ _ _ _ s_p) as Hp.
+  destruct (MaterialPositions.mp_of_board (board s)); [destruct Hp|].
+  destruct p; try discriminate.
+  split; auto.
+  apply s in s_p; auto.
+Qed.
 
 Lemma KRvK_white_inv s pos pos' p :
   material_eq KRvK s ->
@@ -2193,7 +2230,22 @@ Lemma KRvK_white_inv s pos pos' p :
   (p = King /\ pos = white_king s) \/
   (p = Rook /\ pos = pos').
 Proof.
-Admitted.
+  intros s_mat s_p s_rook.
+  specialize (s_mat White p).
+  rewrite <- MaterialPositions.mp_of_board_count in s_mat.
+  pose proof (MaterialPositions.mp_of_board_correct1 _ _ _ _ s_p) as Hp.
+  destruct (MaterialPositions.mp_of_board (board s) White p) eqn:wp; [destruct Hp|].
+  destruct p; try discriminate.
+  + left; split; auto.
+    apply s in s_p; auto.
+  + right; split; auto.
+    apply MaterialPositions.mp_of_board_correct1 in s_rook.
+    rewrite wp in s_rook.
+    destruct l; [|discriminate].
+    destruct s_rook as [|[]].
+    destruct Hp as [|[]].
+    congruence.
+Qed.
 
 Lemma pos_eta (p : Pos) :
   p = (file p, rank p).
@@ -2201,10 +2253,18 @@ Proof.
   now destruct p.
 Qed.
 
+Lemma weaken_dec (P : Prop) :
+  Dec.Dec P -> P \/ ~ P.
+Proof.
+  intros [[|]]; tauto.
+Qed.
+
 Lemma is_threatened_by_dec b pos pl :
   is_threatened_by b pos pl \/ ~ is_threatened_by b pos pl.
 Proof.
-Admitted.
+  apply weaken_dec.
+  apply Dec.Exhaustible_Sig_Dec.
+Qed.
 
 Lemma rank_dist_second_rank_inv r r' :
   edge_rank r ->
