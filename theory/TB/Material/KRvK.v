@@ -2128,41 +2128,216 @@ Proof.
     + right; tauto.
 Qed.
 
-Definition rank_one_up (r : Rank) : Rank.
-Admitted.
+Definition rank_one_up (r : Rank) : Rank :=
+  match next r with
+  | Some r' => r'
+  | None => rank_1 (* dummy val *)
+  end.
 
-Definition file_one_right (f : File) : File.
-Admitted.
+Definition file_one_right (f : File) : File :=
+  match next f with
+  | Some f' => f'
+  | None => file_a (* dummy val *)
+  end.
 
-Definition rank_one_down (r : Rank) : Rank.
-Admitted.
+Definition rank_one_down (r : Rank) : Rank :=
+  match prev r with
+  | Some r' => r'
+  | None => rank_1 (* dummy val *)
+  end.
 
-Definition file_one_left (f : File) : File.
-Admitted.
+Definition file_one_left (f : File) : File :=
+  match prev f with
+  | Some f' => f'
+  | None => file_a (* dummy val *)
+  end.
+
+Lemma next_val {n} (i j : Fin n) :
+  next i = Some j ->
+  val j = S (val i).
+Proof.
+  induction n; intro pf.
+  - destruct i.
+  - destruct i as [[]|i']; simpl in *.
+    + destruct n.
+      * discriminate.
+      * inversion pf; auto.
+    + destruct (next i') eqn:Hi'.
+      * inversion pf.
+        apply IHn in Hi'.
+        congruence.
+      * discriminate.
+Qed.
+
+Lemma prev_None_first {n} (i : Fin (S n)) :
+  prev i = None ->
+  i = inl tt.
+Proof.
+  induction n; intro pf.
+  - destruct i as [[]|[]]; auto.
+  - simpl in pf.
+    destruct i as [[]|j]; auto.
+    destruct (prev j) eqn:Hj.
+    + destruct j.
+      * discriminate.
+      * destruct (prev f0); discriminate.
+    + apply IHn in Hj.
+      rewrite Hj in pf; discriminate.
+Qed.
+
+Lemma prev_val {n} (i j : Fin n) :
+  prev i = Some j ->
+  S (val j) = val i.
+Proof.
+  induction n; intro pf.
+  - destruct i.
+  - destruct i as [[]|i']; simpl in *.
+    + discriminate.
+    + destruct (prev i') eqn:Hi'.
+      * apply IHn in Hi'.
+        inversion pf.
+        congruence.
+      * inversion pf.
+        destruct n.
+        -- destruct i'.
+        -- apply prev_None_first in Hi'.
+           rewrite Hi'; auto.
+Qed.
+
+Lemma next_None_last {n} (i : Fin (S n)) :
+  next i = None -> i = last.
+Proof.
+  induction n; intro pf.
+  - destruct i as [[]|[]].
+    reflexivity.
+  - destruct i as [[]|j].
+    + inversion pf.
+    + simpl.
+      rewrite (IHn j); auto.
+      simpl in pf.
+      destruct j.
+      * simpl.
+        destruct n; auto.
+        discriminate.
+      * simpl.
+        destruct (next f); auto.
+        discriminate.
+Defined.
 
 Lemma rank_one_up_dist (r : Rank) :
   ~ edge_rank r ->
   rank_dist r (rank_one_up r) = 1.
 Proof.
-Admitted.
+  intro pf.
+  unfold rank_one_up.
+  destruct (next r) eqn:r_next.
+  - unfold rank_dist.
+    unfold fin_dist.
+    apply next_val in r_next.
+    rewrite r_next.
+    rewrite Dist.dist_sym.
+    rewrite StateAction.dist_sub; lia.
+  - elim pf; right.
+    apply next_None_last in r_next; auto.
+Qed.
 
 Lemma file_one_right_dist (f : File) :
   ~ edge_file f ->
   file_dist f (file_one_right f) = 1.
 Proof.
-Admitted.
+  intro pf.
+  unfold file_one_right.
+  destruct (next f) eqn:f_next.
+  - unfold file_dist.
+    unfold fin_dist.
+    apply next_val in f_next.
+    rewrite f_next.
+    rewrite Dist.dist_sym.
+    rewrite StateAction.dist_sub; lia.
+  - elim pf; right.
+    apply next_None_last in f_next; auto.
+Qed.
 
 Lemma rank_one_down_dist (r : Rank) :
   ~ edge_rank r ->
   rank_dist r (rank_one_down r) = 1.
 Proof.
-Admitted.
+  intro pf.
+  unfold rank_one_down.
+  destruct (prev r) eqn:r_prev.
+  - unfold rank_dist.
+    unfold fin_dist.
+    apply prev_val in r_prev.
+    rewrite <- r_prev.
+    rewrite StateAction.dist_sub; lia.
+  - elim pf; left.
+    apply prev_None_first in r_prev; auto.
+Qed.
+
+Lemma dist_1_pred_succ i : forall j,
+  Dist.dist i j = 1 ->
+  i = S j \/ S i = j.
+Proof.
+  induction i; intros j pf.
+  - simpl in pf; right; congruence.
+  - simpl in pf.
+    destruct j.
+    + left; auto.
+    + apply IHi in pf; lia.
+Qed.
+
+Lemma val_next {n} (i j : Fin n) :
+  val j = S (val i) -> next i = Some j.
+Proof.
+  induction n.
+  - destruct i.
+  - destruct i as [[]|i']; intro pf.
+    + simpl in *.
+      destruct n.
+      * destruct j.
+        -- discriminate.
+        -- destruct f.
+      * destruct j.
+        -- discriminate.
+        -- destruct f as [[]|]; auto.
+           discriminate.
+    + simpl in *.
+      destruct j as [[]|j'].
+      * discriminate.
+      * apply Nat.succ_inj in pf.
+        apply IHn in pf.
+        rewrite pf; auto.
+Qed.
+
+Lemma fin_dist_1_prev_next {n} (i j : Fin (S n)) :
+  fin_dist i j = 1 ->
+  prev i = Some j \/ next i = Some j.
+Proof.
+  intro pf.
+  apply dist_1_pred_succ in pf.
+  destruct pf.
+  - left.
+    apply val_next in H.
+    apply prev_next; auto.
+  - right.
+    apply val_next; congruence.
+Qed.
 
 Lemma file_one_left_dist (f : File) :
   ~ edge_file f ->
   file_dist f (file_one_left f) = 1.
 Proof.
-Admitted.
+  intro pf.
+  unfold file_one_left.
+  destruct (prev f) eqn:f_prev.
+  - unfold file_dist.
+    unfold fin_dist.
+    apply prev_val in f_prev.
+    rewrite <- f_prev.
+    rewrite StateAction.dist_sub; lia.
+  - elim pf; left.
+    apply prev_None_first in f_prev; auto.
+Qed.
 
 Lemma rank_up_down (r : Rank) :
   ~ edge_rank r -> forall r',
@@ -2170,7 +2345,32 @@ Lemma rank_up_down (r : Rank) :
   rank_dist r' (rank_one_down r) <= 1 ->
   r' = r.
 Proof.
-Admitted.
+  intros pf1 r' pf2 pf3.
+  unfold rank_one_up, rank_one_down in *.
+  destruct (next r) eqn:next_r.
+  - destruct (prev r) eqn:prev_r.
+    + apply next_val in next_r.
+      apply prev_val in prev_r.
+      rewrite <- prev_r in next_r.
+      unfold rank_dist, fin_dist in *.
+      rewrite next_r in pf2.
+      rewrite Nat.le_1_r in *.
+      destruct pf2 as [pf2|pf2].
+      * apply dist_0 in pf2.
+        rewrite pf2 in pf3.
+        rewrite StateAction.dist_sub in pf3; lia.
+      * destruct pf3 as [pf3|pf3].
+        -- apply dist_0 in pf3.
+           rewrite pf3 in pf2.
+           rewrite Dist.dist_sym in pf2.
+           rewrite StateAction.dist_sub in pf2; lia.
+        -- apply dist_1_pred_succ in pf2, pf3.
+           apply val_inj; lia.
+    + elim pf1; left.
+      now apply prev_None_first in prev_r.
+  - elim pf1; right.
+    now apply next_None_last in next_r.
+Qed.
 
 Lemma file_right_left (f : File) :
   ~ edge_file f -> forall f',
@@ -2178,7 +2378,32 @@ Lemma file_right_left (f : File) :
   file_dist f' (file_one_left f) <= 1 ->
   f' = f.
 Proof.
-Admitted.
+  intros pf1 r' pf2 pf3.
+  unfold file_one_right, file_one_left in *.
+  destruct (next f) eqn:next_f.
+  - destruct (prev f) eqn:prev_f.
+    + apply next_val in next_f.
+      apply prev_val in prev_f.
+      rewrite <- prev_f in next_f.
+      unfold file_dist, fin_dist in *.
+      rewrite next_f in pf2.
+      rewrite Nat.le_1_r in *.
+      destruct pf2 as [pf2|pf2].
+      * apply dist_0 in pf2.
+        rewrite pf2 in pf3.
+        rewrite StateAction.dist_sub in pf3; lia.
+      * destruct pf3 as [pf3|pf3].
+        -- apply dist_0 in pf3.
+           rewrite pf3 in pf2.
+           rewrite Dist.dist_sym in pf2.
+           rewrite StateAction.dist_sub in pf2; lia.
+        -- apply dist_1_pred_succ in pf2, pf3.
+           apply val_inj; lia.
+    + elim pf1; left.
+      now apply prev_None_first in prev_f.
+  - elim pf1; right.
+    now apply next_None_last in next_f.
+Qed.
 
 Lemma kings_do_not_touch s :
   ~ neighbor_preadj (black_king s) (white_king s).
@@ -2273,7 +2498,27 @@ Lemma rank_dist_second_rank_inv r r' :
   r' = second_rank r \/
   r' = r.
 Proof.
-Admitted.
+  intros pf1 pf2.
+  unfold second_rank, third_rank in *.
+  destruct pf1; destruct (Dec.eq_dec r rank_1); subst.
+  - rewrite Nat.le_1_r in pf2.
+    destruct pf2 as [pf2|pf2].
+    + right; left; now apply fin_dist_0.
+    + apply dist_1_pred_succ in pf2.
+      destruct pf2 as [pf2|pf2].
+      * left; now apply val_inj.
+      * right; right.
+        apply val_inj; auto.
+  - contradiction.
+  - discriminate.
+  - rewrite Nat.le_1_r in pf2.
+    destruct pf2 as [pf2|pf2].
+    + right; left; now apply fin_dist_0.
+    + apply dist_1_pred_succ in pf2.
+      destruct pf2 as [pf2|pf2].
+      * right; right; now apply val_inj.
+      * left; apply val_inj; auto.
+Qed.
 
 Lemma file_dist_second_file_inv f f' :
   edge_file f ->
@@ -2282,15 +2527,63 @@ Lemma file_dist_second_file_inv f f' :
   f' = second_file f \/
   f' = f.
 Proof.
-Admitted.
+  intros pf1 pf2.
+  unfold second_file, third_file in *.
+  destruct pf1; destruct (Dec.eq_dec f file_a); subst.
+  - rewrite Nat.le_1_r in pf2.
+    destruct pf2 as [pf2|pf2].
+    + right; left; now apply fin_dist_0.
+    + apply dist_1_pred_succ in pf2.
+      destruct pf2 as [pf2|pf2].
+      * left; now apply val_inj.
+      * right; right.
+        apply val_inj; auto.
+  - contradiction.
+  - discriminate.
+  - rewrite Nat.le_1_r in pf2.
+    destruct pf2 as [pf2|pf2].
+    + right; left; now apply fin_dist_0.
+    + apply dist_1_pred_succ in pf2.
+      destruct pf2 as [pf2|pf2].
+      * right; right; now apply val_inj.
+      * left; apply val_inj; auto.
+Qed.
+
+Lemma next_never_first {n} (i : Fin (S n)) :
+  next i <> Some (inl tt).
+Proof.
+  destruct i as [[]|j].
+  - destruct n; discriminate.
+  - simpl; destruct (next j); discriminate.
+Qed.
 
 Lemma rank_dist_edge_rank r r' :
   edge_rank r ->
-  file_dist r' r <= 1 ->
+  rank_dist r' r <= 1 ->
   r' = r \/
   r' = second_rank r.
 Proof.
-Admitted.
+  intros pf1 pf2.
+  inversion pf2.
+  - right.
+    unfold second_rank.
+    destruct pf1; destruct (Dec.eq_dec r rank_1); try contradiction; subst.
+    + apply fin_dist_1_prev_next in H0.
+      destruct H0.
+      * apply next_prev in H.
+        inversion H; auto.
+      * apply next_never_first in H.
+        destruct H.
+    + subst; discriminate.
+    + apply fin_dist_1_prev_next in H0.
+      destruct H0.
+      * apply next_prev in H.
+        inversion H.
+      * apply prev_next in H.
+        inversion H; auto.
+  - left; apply fin_dist_0.
+    unfold rank_dist in H0; lia.
+Qed.
 
 Lemma file_dist_edge_file f f' :
   edge_file f ->
@@ -2298,7 +2591,27 @@ Lemma file_dist_edge_file f f' :
   f' = f \/
   f' = second_file f.
 Proof.
-Admitted.
+  intros pf1 pf2.
+  inversion pf2.
+  - right.
+    unfold second_file.
+    destruct pf1; destruct (Dec.eq_dec f file_a); try contradiction; subst.
+    + apply fin_dist_1_prev_next in H0.
+      destruct H0.
+      * apply next_prev in H.
+        inversion H; auto.
+      * apply next_never_first in H.
+        destruct H.
+    + subst; discriminate.
+    + apply fin_dist_1_prev_next in H0.
+      destruct H0.
+      * apply next_prev in H.
+        inversion H.
+      * apply prev_next in H.
+        inversion H; auto.
+  - left; apply fin_dist_0.
+    unfold file_dist in H0; lia.
+Qed.
 
 Lemma checkmate_neighborhood : forall pl s,
   atomic_chess_res s = Some (Game.Win pl) -> forall pos,
