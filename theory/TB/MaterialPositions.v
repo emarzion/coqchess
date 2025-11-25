@@ -6,7 +6,7 @@ Require Import Games.Util.Dec.
 Require Import Games.Game.Player.
 Require Import Chess.Chess.
 
-Require Import Chess.TB.Material.
+Require Import Chess.TB.Material.Material.
 
 Require Import Chess.Util.MatAction.
 

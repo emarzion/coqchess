@@ -1,12 +1,23 @@
+Require Import Lia.
+
 Require Import TBGen.StratSymTB.TB.
 Require Import TBGen.StratSymTB.OCamlTB.
 
 Require Import Chess.Chess.Chess.
 Require Import Chess.Util.UIP.
 Require Import Games.Util.Dec.
-Require Import Chess.TB.Material.
+Require Import Chess.TB.Material.Material.
 Require Import Chess.TB.Symmetry.
 Require Import Chess.TB.Hash.
+Require Import Chess.TB.Material.KRvK_bound.
+
+Global Instance Hash_ChessState : IntHash.CondIntHash KRvK_bound.
+Proof.
+  unshelve econstructor.
+  - exact hash_state.
+  - apply hash_state_correct.
+    compute; lia.
+Defined.
 
 Global Instance ReverseChess : Reversible ChessGame.
 Proof.
@@ -78,11 +89,16 @@ Proof.
   - right; congruence.
 Defined.
 
-Global Instance KRvK_Fin : FinPred KRvK.
+Global Instance KRvK_Fin : FinPred KRvK_bound.
 Proof.
-Admitted.
+  unshelve econstructor.
+  - exact KRvK_bound.checkmates.
+  - exact KRvK_bound.checkmates_correct1.
+  - exact KRvK_bound.checkmates_correct2.
+  - exact KRvK_bound.checkmates_correct3.
+Defined.
 
-Global Instance KRvK_closed : Closed.Closed KRvK.
+Global Instance KRvK_closed : Closed.Closed KRvK_bound.
 Proof.
   constructor.
   intros s pf m.
@@ -138,18 +154,18 @@ Proof.
   right; intros [x px]; destruct x; contradiction.
 Defined.
 
-Global Instance KRvK_dec1 : Closed.Dec1 KRvK.
+Global Instance KRvK_dec1 : Closed.Dec1 KRvK_bound.
 Proof.
   constructor.
   intro s.
-  unfold KRvK.
+  unfold KRvK_bound.
   apply pi_dec; intro c.
   apply pi_dec; intro p.
   apply Compare_dec.le_dec.
 Defined.
 
 Global Instance KRvK_bisim_closed :
-  Closed.Bisim_closed auto KRvK.
+  Closed.Bisim_closed auto KRvK_bound.
 Proof.
   simpl; constructor.
   intros s s' mat [x Hx] c p; subst.

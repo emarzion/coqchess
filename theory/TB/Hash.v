@@ -13,7 +13,7 @@ Require Import Chess.Util.Fin.
 
 Require Import TBGen.Util.IntHash.
 
-Require Import Chess.TB.Material.
+Require Import Chess.TB.Material.Material.
 Require Import Chess.TB.MaterialPositions.
 Require Import Chess.TB.StateAction.
 
@@ -1302,11 +1302,3 @@ Proof.
   - apply hash_mp_bound with (m := m); auto.
   - apply hash_mp_bound with (m := m); auto.
 Qed.
-
-Global Instance Hash_ChessState : IntHash.CondIntHash KRvK.
-Proof.
-  unshelve econstructor.
-  - exact hash_state.
-  - apply hash_state_correct.
-    compute; lia.
-Defined.
