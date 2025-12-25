@@ -264,28 +264,16 @@ Definition reverse_states (s : ChessState) : list ChessState :=
     (reverse_prestates_correct3 s)
     (reverse_prestates_correct4 s).
 
-Axiom todo : forall {X}, X.
-
 Lemma reverse_states_correct1 : forall s s',
   In s (reverse_states s') ->
   { m : ChessMove s & exec_ChessMove m = s' }.
 Proof.
   intros s s' pf.
   unfold reverse_states in pf; simpl in *.
-  
-
-  assert (ChessMove s).
-  { constructor; unshelve econstructor.
-    - constructor.
-      + exact King.
-      + exact (file_a, rank_1).
-      + exact (file_a, rank_1).
-    - constructor.
-      + simpl.
-
-  }
-  exists X.
-  apply todo.
+  apply In_mk_ChessStates_weaken in pf.
+  unfold reverse_prestates in pf.
+  rewrite filter_In in pf.
+  rewrite in_flat_map in pf.
 Admitted.
 
 Lemma reverse_states_correct2 : forall s (m : ChessMove s),
