@@ -10,6 +10,7 @@ Require Import Chess.TB.Material.Material.
 Require Import Chess.TB.Symmetry.
 Require Import Chess.TB.Hash.
 Require Import Chess.TB.Material.KRvK_bound.
+Require Import Chess.TB.Reverse.
 
 Global Instance Hash_ChessState : IntHash.CondIntHash KRvK_bound.
 Proof.
@@ -21,7 +22,11 @@ Defined.
 
 Global Instance ReverseChess : Reversible ChessGame.
 Proof.
-Admitted.
+  unshelve econstructor.
+  - exact reverse_states.
+  - exact reverse_states_correct1.
+  - exact reverse_states_correct2.
+Defined.
 
 Global Instance NiceChess : NiceGame ChessGame.
 Proof.

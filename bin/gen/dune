@@ -1,0 +1,32 @@
+(coq.extraction
+  (prelude Extract)
+  (extracted_modules TBGen)
+  (theories Games TBGen Chess))
+
+(library
+  (name extracted_code)
+  (modules
+    ;; Patch code
+    M
+    Uint63
+
+    ;; Extracted code
+    TBGen
+  ))
+
+(env
+  (dev
+    (flags (:standard -w -39 -w -33 -w -20))
+    (ocamlopt_flags (:standard -O3)))
+  (release
+    (ocamlopt_flags (:standard -O3))))
+
+(executable
+  (name gen_file)
+  (modules gen_file)
+  (libraries extracted_code yojson))
+
+(rule
+  (targets tb_w.json tb_b.json)
+  (deps gen_file.exe)
+  (action (run time ./gen_file.exe)))

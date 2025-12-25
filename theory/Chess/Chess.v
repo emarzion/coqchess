@@ -1002,6 +1002,9 @@ Definition rook_candidate_destinations
   (st : ChessState) (pos : Pos) : list Pos :=
   map (@projT1 _ _) (filter_dec (orthog_adj (board st) pos) all_pos).
 
+Print orthog_adj.
+Print horiz_adj.
+
 Lemma rook_candidate_destinations_correct1 pos st : forall pos',
   In pos' (rook_candidate_destinations st pos) ->
   orthog_adj (board st) pos pos'.
