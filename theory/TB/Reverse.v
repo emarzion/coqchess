@@ -309,13 +309,74 @@ Lemma diag_preadj_sym p p' :
   diag_preadj p p' ->
   diag_preadj p' p.
 Proof.
-Admitted.
+  unfold diag_preadj.
+  rewrite rank_dist_sym.
+  rewrite file_dist_sym at 1; auto.
+Qed.
+
+Lemma dist_split x y z :
+  x < y < z ->
+  Dist.dist x z = Dist.dist x y + Dist.dist y z.
+Proof.
+  intros [pf1 pf2].
+  rewrite (Dist.dist_sym x z).
+  rewrite (Dist.dist_sym x y).
+  rewrite (Dist.dist_sym y z).
+  rewrite StateAction.dist_sub at 1; [|lia].
+  rewrite StateAction.dist_sub at 1; [|lia].
+  rewrite StateAction.dist_sub at 1; [|lia].
+  lia.
+Qed.
+
+Lemma file_sbetween_dist_split f1 f2 f3 :
+  file_sbetween f1 f2 f3 ->
+  file_dist f1 f3 =
+  file_dist f1 f2 + file_dist f2 f3.
+Proof.
+  intros [pf|pf].
+  - now apply dist_split.
+  - unfold file_dist.
+    rewrite (Fin.fin_dist_sym f1 f3).
+    rewrite (Fin.fin_dist_sym f1 f2).
+    rewrite (Fin.fin_dist_sym f2 f3).
+    rewrite PeanoNat.Nat.add_comm.
+    now apply dist_split.
+Qed.
+
+Lemma rank_sbetween_dist_split r1 r2 r3 :
+  rank_sbetween r1 r2 r3 ->
+  rank_dist r1 r3 =
+  rank_dist r1 r2 + rank_dist r2 r3.
+Proof.
+  intros [pf|pf].
+  - now apply dist_split.
+  - unfold rank_dist.
+    rewrite (Fin.fin_dist_sym r1 r3).
+    rewrite (Fin.fin_dist_sym r1 r2).
+    rewrite (Fin.fin_dist_sym r2 r3).
+    rewrite PeanoNat.Nat.add_comm.
+    now apply dist_split.
+Qed.
 
 Lemma diag_adj_sym b p p' :
   diag_adj b p p' ->
   diag_adj b p' p.
 Proof.
-Admitted.
+  intros [pf1 pf2]; split.
+  - apply diag_preadj_sym; auto.
+  - intros.
+    apply pf2.
+    + unfold diag_preadj in *.
+      apply file_sbetween_dist_split in H0.
+      apply rank_sbetween_dist_split in H1.
+      rewrite rank_dist_sym.
+      rewrite file_dist_sym at 1.
+      rewrite rank_dist_sym in pf1.
+      rewrite file_dist_sym in pf1 at 1.
+      lia.
+    + now apply file_sbetween_sym.
+    + now apply rank_sbetween_sym.
+Qed.
 
 Lemma horiz_preadj_sym p p' :
   horiz_preadj p p' ->
@@ -437,13 +498,79 @@ Lemma non_pawn_piece_adj_update_L pc b p p' o :
   non_pawn_piece_adj pc b p p' ->
   non_pawn_piece_adj pc (Mat.mupdate p o b) p p'.
 Proof.
-Admitted.
+  unfold non_pawn_piece_adj; intro pf; destruct pc; auto.
+  - destruct pf as [[pf1 pf2]|[[pf1 pf2]|[pf1 pf2]]].
+    + left; unfold diag_adj in *.
+      split; auto; intros; unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply file_sbetween_neq_left in H0; auto.
+    + right; left; split; auto; intros.
+      unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply file_sbetween_neq_left in H0; auto.
+    + right; right; split; auto; intros.
+      unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply rank_sbetween_neq_left in H0; auto.
+  - destruct pf as [[pf1 pf2]|[pf1 pf2]].
+    + left; split; auto; intros.
+      unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply file_sbetween_neq_left in H0; auto.
+    + right; split; auto; intros.
+      unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply rank_sbetween_neq_left in H0; auto.
+  - destruct pf as [pf1 pf2]; split; auto; intros.
+    unfold lookup_piece.
+    rewrite Mat.maccess_mupdate_neq.
+    + apply pf2; auto.
+    + apply file_sbetween_neq_left in H0; auto.
+Qed.
 
 Lemma non_pawn_piece_adj_update_R pc b p p' o :
   non_pawn_piece_adj pc b p p' ->
   non_pawn_piece_adj pc (Mat.mupdate p' o b) p p'.
 Proof.
-Admitted.
+  unfold non_pawn_piece_adj; intro pf; destruct pc; auto.
+  - destruct pf as [[pf1 pf2]|[[pf1 pf2]|[pf1 pf2]]].
+    + left; unfold diag_adj in *.
+      split; auto; intros; unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply file_sbetween_neq_right in H0; auto.
+    + right; left; split; auto; intros.
+      unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply file_sbetween_neq_right in H0; auto.
+    + right; right; split; auto; intros.
+      unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply rank_sbetween_neq_right in H0; auto.
+  - destruct pf as [[pf1 pf2]|[pf1 pf2]].
+    + left; split; auto; intros.
+      unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply file_sbetween_neq_right in H0; auto.
+    + right; split; auto; intros.
+      unfold lookup_piece.
+      rewrite Mat.maccess_mupdate_neq.
+      * apply pf2; auto.
+      * apply rank_sbetween_neq_right in H0; auto.
+  - destruct pf as [pf1 pf2]; split; auto; intros.
+    unfold lookup_piece.
+    rewrite Mat.maccess_mupdate_neq.
+    + apply pf2; auto.
+    + apply file_sbetween_neq_right in H0; auto.
+Qed.
 
 Lemma move_reversible c pc b p p' :
   non_pawn_piece_adj pc b p p' ->
