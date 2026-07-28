@@ -271,14 +271,19 @@ Proof.
     unfold lookup_piece in pf1.
     rewrite @maccess_mat_act in pf1.
     elim (no_resulting_check pf (inv x @ pos)); auto.
-    destruct pf2 as [p [piece [pf2 pf3]]].
-    exists (inv x @ p), piece; split.
-    + unfold lookup_piece in pf2.
-      rewrite @maccess_mat_act in pf2; auto.
-    + apply non_pawn_piece_adj_act with (x := inv x) in pf3.
-      rewrite act_assoc in pf3.
-      rewrite inv_left in pf3.
-      rewrite act_id in pf3; auto.
+    destruct pf2 as [piece [p [pf2 [pf3 pf4]]]].
+    exists piece, (inv x @ p); repeat split.
+    + intro pf'; apply pf2.
+      apply (f_equal (act x)) in pf'.
+      repeat rewrite act_assoc in pf'.
+      rewrite inv_right in pf'.
+      repeat rewrite act_id in pf'; auto.
+    + unfold lookup_piece in pf3.
+      rewrite @maccess_mat_act in pf3; auto.
+    + apply non_pawn_piece_adj_act with (x := inv x) in pf4.
+      rewrite act_assoc in pf4.
+      rewrite inv_left in pf4.
+      rewrite act_id in pf4; auto.
 Qed.
 
 Definition act_reg_move (x : d8_group) {s} (m : RegularMove s) :
@@ -438,8 +443,13 @@ Proof.
   unfold lookup_piece in pf1.
   rewrite @maccess_mat_act in pf1.
   apply pf in pf1.
-  destruct pf1 as [p [piece [pf1 pf2]]].
-  exists (x @ p), piece; split.
+  destruct pf1 as [piece [p [pf_neq [pf1 pf2]]]].
+  exists piece, (x @ p); repeat split.
+  - intro pf3; apply pf_neq.
+    apply (f_equal (act (inv x))) in pf3.
+    rewrite act_assoc in pf3.
+    rewrite inv_left in pf3.
+    rewrite act_id in pf3; auto.
   - unfold lookup_piece.
     rewrite @maccess_act; auto.
   - apply non_pawn_piece_adj_act with (x := x) in pf2.

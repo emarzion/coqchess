@@ -581,8 +581,13 @@ Proof.
     apply opp_to_play_not_in_check in pf1.
     intro pf2; apply pf1.
     unfold is_threatened_by in pf2.
-    destruct pf2 as [pos' [piece [Hlookup Hadj]]].
-    exists (inv x @ pos'), piece; split.
+    destruct pf2 as [piece [pos' [Hneq [Hlookup Hadj]]]].
+    exists piece, (inv x @ pos'); repeat split.
+    + intro pf; apply Hneq.
+      apply (f_equal (act x)) in pf.
+      repeat rewrite act_assoc in pf.
+      rewrite inv_right in pf.
+      repeat rewrite act_id in pf; auto.
     + unfold lookup_piece in *.
       rewrite @maccess_mat_act in Hlookup; auto.
     + apply non_pawn_piece_adj_act with (x := inv x) in Hadj.

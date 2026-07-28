@@ -250,8 +250,8 @@ Proof.
   rewrite filter_In in pf.
   destruct pf as [_ pf].
   unfold pre_opp_to_play_not_in_check.
-  unfold is_threatened_byb in pf.
-  destruct Games.Util.Dec.dec; [discriminate|].
+  rewrite Bool.negb_true_iff in pf.
+  rewrite <- is_threatened_byb_false_iff in pf.
   intros p Hp.
   pose proof (reverse_prestates_correct3 s) as Hs.
   rewrite Forall_forall in Hs.

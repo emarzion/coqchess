@@ -387,7 +387,7 @@ Proof.
     lookup_piece_inversion; try discriminate.
     clear pf1.
     unfold is_threatened_by in pf2.
-    destruct pf2 as [pos' [piece [pf1 pf2]]].
+    destruct pf2 as [piece [pos' [pf_neq [pf1 pf2]]]].
     lookup_piece_inversion; try discriminate.
     inversion pf1; subst.
     unfold non_pawn_piece_adj in pf2.
@@ -401,7 +401,7 @@ Proof.
     lookup_piece_inversion; try discriminate.
     clear pf1.
     unfold is_threatened_by in pf2.
-    destruct pf2 as [pos' [piece [pf1 pf2]]].
+    destruct pf2 as [piece [pos' [pf_neq [pf1 pf2]]]].
     lookup_piece_inversion; try discriminate.
     inversion pf1; subst.
     unfold non_pawn_piece_adj in pf2.
@@ -526,16 +526,6 @@ Proof.
   destruct le_dec; auto.
 Qed.
 
-Lemma fin_dist_refl {n} (i : Fin n) :
-  fin_dist i i = 0.
-Proof.
-  induction n.
-  - destruct i.
-  - destruct i as [|j].
-    + reflexivity.
-    + apply IHn.
-Qed.
-
 Lemma NoDup_cfg_file cfg i :
   In cfg corner_king_configs ->
   In i (at_least_two_away (rank (corner cfg))) ->
@@ -615,15 +605,6 @@ Proof.
     + lia.
     + intro pf.
       apply IHx in pf; lia.
-Qed.
-
-Lemma fin_dist_0 {n} (i j : Fin.Fin n) :
-  fin_dist i j = 0 -> i = j.
-Proof.
-  unfold fin_dist.
-  intro pf.
-  apply dist_0 in pf.
-  apply val_inj; auto.
 Qed.
 
 Lemma pos_eq (p p' : Pos) :
@@ -931,10 +912,12 @@ Proof.
   destruct (check cfg) eqn:check_type.
   - rewrite in_map_iff in pf2.
     destruct pf2 as [i [Hi1 Hi2]].
-    pose proof (s_play := PreChessState_of_ChessState_pre_chess_to_play s).
+    pose proof (s_play :=
+      PreChessState_of_ChessState_pre_chess_to_play s).
     rewrite <- Hi1 in s_play.
     simpl in s_play; symmetry in s_play.
-    pose proof (s_board := PreChessState_of_ChessState_pre_board s).
+    pose proof (s_board :=
+      PreChessState_of_ChessState_pre_board s).
     rewrite <- Hi1 in s_board.
     unfold pre_board in s_board.
     symmetry in s_board.
@@ -943,8 +926,21 @@ Proof.
       * rewrite s_play; auto.
       * elim nchk.
         intros bk Hbk.
-        exists (file (corner cfg), i).
-        exists Rook; split.
+        exists Rook.
+        exists (file (corner cfg), i); repeat split.
+        -- assert (bk = corner cfg).
+           { transitivity (pre_black_king
+               (PreChessState_of_ChessState s)).
+             ++ apply (kings_unique s Black).
+                rewrite s_play in Hbk; auto.
+             ++ rewrite <- Hi1; auto.
+           }
+           subst.
+           intro pf.
+           apply (f_equal rank) in pf; simpl in pf.
+           rewrite pf in Hi2.
+           apply In_at_least_two_away in Hi2.
+           rewrite fin_dist_refl in Hi2; lia.
         -- rewrite s_board.
             apply lookup_piece_place_pieces.
            ++ rewrite s_play.
@@ -986,7 +982,17 @@ Proof.
            ++ unfold updated_board.
               rewrite lookup_clear_neq; [|congruence].
               rewrite lookup_place_eq; congruence.
-           ++ exists (file (corner cfg), i), Rook; split.
+           ++ exists Rook, (file (corner cfg), i);
+                repeat split.
+              ** intro pf3.
+                 rewrite <- origin_dest_adj in pf3.
+                 apply (f_equal rank) in pf3.
+                 simpl in pf3.
+                 rewrite <- pf3 in Hi2.
+                 apply In_at_least_two_away in Hi2.
+                 rewrite second_rank_dist in Hi2; [lia|].
+                 apply corner_is_corner in pf1.
+                 apply pf1.
               ** unfold updated_board.
                  rewrite pf2.
                  rewrite <- origin_dest_adj.
@@ -1031,7 +1037,11 @@ apply corner_king_configs_off_corner_corner_file_neq in Hp1; auto.
            ++ unfold updated_board.
               rewrite lookup_clear_neq; [|congruence].
               rewrite lookup_place_eq; congruence.
-           ++ exists (off_corner cfg), King; split.
+           ++ exists King, (off_corner cfg); split; [|split].
+              ** rewrite <- origin_dest_adj.
+                 unfold corner_king_configs in pf1.
+                 simpl in pf1.
+                 destruct_or; subst; discriminate.
               ** unfold updated_board.
                  rewrite pf2.
                  rewrite <- origin_dest_adj.
@@ -1052,7 +1062,11 @@ apply corner_king_configs_off_corner_corner_file_neq in Hp1; auto.
            ++ unfold updated_board.
               rewrite lookup_clear_neq; [|congruence].
               rewrite lookup_place_eq; congruence.
-           ++ exists (off_corner cfg), King; split.
+           ++ exists King, (off_corner cfg); split; [|split].
+              ** rewrite <- origin_dest_adj.
+                 unfold corner_king_configs in pf1.
+                 simpl in pf1.
+                 destruct_or; subst; discriminate.
               ** unfold updated_board.
                  rewrite pf2.
                  rewrite <- origin_dest_adj.
@@ -1086,8 +1100,18 @@ apply corner_king_configs_off_corner_corner_file_neq in Hp1; auto.
       * rewrite s_play; auto.
       * elim nchk.
         intros bk Hbk.
-        exists (i, rank (corner cfg)).
-        exists Rook; split.
+        exists Rook.
+        exists (i, rank (corner cfg)); split; [|split].
+        -- rewrite s_play in Hbk.
+           apply s in Hbk.
+           rewrite Hbk.
+           destruct s; inversion Hi1; simpl.
+           rewrite H3 in *.
+           intro Heq.
+           apply (f_equal file) in Heq; simpl in Heq.
+           rewrite Heq in Hi2.
+           apply In_at_least_two_away in Hi2.
+           rewrite fin_dist_refl in Hi2; lia.
         -- rewrite s_board.
             apply lookup_piece_place_pieces.
            ++ rewrite s_play.
@@ -1129,7 +1153,11 @@ apply corner_king_configs_off_corner_corner_file_neq in Hp1; auto.
            ++ unfold updated_board.
               rewrite lookup_clear_neq; [|congruence].
               rewrite lookup_place_eq; congruence.
-           ++ exists (off_corner cfg), King; split.
+           ++ exists King, (off_corner cfg); split; [|split].
+              ** rewrite <- origin_dest_adj.
+                 unfold corner_king_configs in pf1.
+                 simpl in pf1.
+                 destruct_or; subst; discriminate.
               ** unfold updated_board.
                  rewrite pf2.
                  rewrite <- origin_dest_adj.
@@ -1150,7 +1178,16 @@ apply corner_king_configs_off_corner_corner_file_neq in Hp1; auto.
            ++ unfold updated_board.
               rewrite lookup_clear_neq; [|congruence].
               rewrite lookup_place_eq; congruence.
-           ++ exists (i, rank (corner cfg)), Rook; split.
+           ++ exists Rook, (i, rank (corner cfg)); split; [|split].
+              ** rewrite <- origin_dest_adj.
+                 intro Heq.
+                 apply (f_equal file) in Heq.
+                 simpl in Heq.
+                 rewrite <- Heq in Hi2.
+                 apply In_at_least_two_away in Hi2.
+                 rewrite second_file_dist in Hi2; [lia|].
+                 apply corner_is_corner in pf1.
+                 apply pf1.
               ** unfold updated_board.
                  rewrite pf2.
                  rewrite <- origin_dest_adj.
@@ -1195,7 +1232,11 @@ apply corner_king_configs_off_corner_corner_rank_neq in Hp1; auto.
            ++ unfold updated_board.
               rewrite lookup_clear_neq; [|congruence].
               rewrite lookup_place_eq; congruence.
-           ++ exists (off_corner cfg), King; split.
+           ++ exists King, (off_corner cfg); split; [|split].
+              ** rewrite <- origin_dest_adj.
+                 unfold corner_king_configs in pf1.
+                 simpl in pf1.
+                 destruct_or; subst; discriminate.
               ** unfold updated_board.
                  rewrite pf2.
                  rewrite <- origin_dest_adj.
@@ -1605,7 +1646,7 @@ Proof.
     lookup_piece_inversion; try discriminate.
     clear pf1.
     unfold is_threatened_by in pf2.
-    destruct pf2 as [pos' [piece [pf1 pf2]]].
+    destruct pf2 as [pos' [piece [pf_neq [pf1 pf2]]]].
     lookup_piece_inversion; try discriminate.
     inversion pf1; subst.
     destruct pf2 as [_ pf2]; simpl in pf2.
@@ -1619,7 +1660,7 @@ Proof.
     lookup_piece_inversion; try discriminate.
     clear pf1.
     unfold is_threatened_by in pf2.
-    destruct pf2 as [pos' [piece [pf1 pf2]]].
+    destruct pf2 as [pos' [piece [pf_neq [pf1 pf2]]]].
     lookup_piece_inversion; try discriminate.
     inversion pf1; subst.
     destruct pf2 as [pf2 _]; simpl in pf2.
@@ -1820,8 +1861,18 @@ Proof.
       * rewrite s_play; auto.
       * elim nchk.
         intros bk Hbk.
-        exists (file (edge cfg), i).
-        exists Rook; split.
+        exists Rook.
+        exists (file (edge cfg), i); split; [|split].
+        -- rewrite s_play in Hbk.
+           apply s in Hbk.
+           rewrite Hbk.
+           destruct s; inversion Hi1; simpl.
+           rewrite H3 in *.
+           intro Heq.
+           apply (f_equal rank) in Heq; simpl in Heq.
+           rewrite Heq in Hi2.
+           apply In_at_least_two_away in Hi2.
+           rewrite fin_dist_refl in Hi2; lia.
         -- rewrite s_board.
             apply lookup_piece_place_pieces.
            ++ rewrite s_play.
@@ -1863,7 +1914,13 @@ Proof.
            rewrite lookup_clear_neq; [|congruence].
            rewrite lookup_place_eq.
            congruence.
-        -- exists (file (edge cfg), i), Rook; split.
+        -- exists Rook, (file (edge cfg), i); split; [|split].
+           ++ intro Heq.
+              apply (f_equal rank) in Heq.
+              simpl in Heq.
+              rewrite Heq in pf_r.
+              apply In_at_least_two_away in Hi2.
+              unfold rank_dist in pf_r; lia.
            ++ unfold updated_board.
               rewrite lookup_clear_neq.
               ** rewrite lookup_place_neq.
@@ -1901,8 +1958,14 @@ Proof.
            rewrite lookup_clear_neq; [|congruence].
            rewrite lookup_place_eq.
            congruence.
-        -- exists (third_file (file (edge cfg)),
-            rank (edge cfg)), King; split.
+        -- exists King, (third_file (file (edge cfg)),
+            rank (edge cfg)); split; [|split].
+           ++ intro Heq.
+              apply (f_equal file) in Heq.
+              simpl in Heq.
+              rewrite Heq in f_1.
+              rewrite dist_third_file in f_1; [lia|].
+              apply vert_check_edge_file; auto.
            ++ unfold updated_board.
               rewrite lookup_clear_neq.
               ** rewrite lookup_place_neq.
@@ -1940,8 +2003,18 @@ Proof.
       * rewrite s_play; auto.
       * elim nchk.
         intros bk Hbk.
-        exists (i, rank (edge cfg)).
-        exists Rook; split.
+        exists Rook.
+        exists (i, rank (edge cfg)); split; [|split].
+        -- rewrite s_play in Hbk.
+           apply s in Hbk.
+           rewrite Hbk.
+           destruct s; inversion Hi1; simpl.
+           rewrite H3 in *.
+           intro Heq.
+           apply (f_equal file) in Heq; simpl in Heq.
+           rewrite Heq in Hi2.
+           apply In_at_least_two_away in Hi2.
+           rewrite fin_dist_refl in Hi2; lia.
         -- rewrite s_board.
             apply lookup_piece_place_pieces.
            ++ rewrite s_play.
@@ -1983,7 +2056,14 @@ Proof.
            rewrite lookup_clear_neq; [|congruence].
            rewrite lookup_place_eq.
            congruence.
-        -- exists (i, rank (edge cfg)), Rook; split.
+        -- exists Rook, (i, rank (edge cfg)); split; [|split].
+           ++ intro Heq.
+              apply (f_equal file) in Heq.
+              simpl in Heq.
+              rewrite Heq in pf_f.
+              apply In_at_least_two_away in Hi2.
+              unfold file_dist in pf_f.
+              lia.
            ++ unfold updated_board.
               rewrite lookup_clear_neq.
               ** rewrite lookup_place_neq.
@@ -2021,8 +2101,14 @@ Proof.
            rewrite lookup_clear_neq; [|congruence].
            rewrite lookup_place_eq.
            congruence.
-        -- exists (file (edge cfg),
-           third_rank (rank (edge cfg))), King; split.
+        -- exists King, (file (edge cfg),
+           third_rank (rank (edge cfg))); split; [|split].
+           ++ intro Heq.
+              apply (f_equal rank) in Heq.
+              simpl in Heq.
+              rewrite Heq in r_1.
+              rewrite dist_third_rank in r_1; [lia|].
+              apply horiz_check_edge_rank; auto.
            ++ unfold updated_board.
               rewrite lookup_clear_neq.
               ** rewrite lookup_place_neq.
@@ -2413,13 +2499,25 @@ Proof.
   - apply (opp_to_play_not_in_check s (black_king s)).
     + rewrite s_play; apply lookup_black_king.
     + rewrite s_play.
-      exists (white_king s), King; split.
+      exists King, (white_king s); split; [|split].
+      * intro pf'.
+        apply (f_equal (fun p => lookup_piece p (board s))) in pf'.
+        change (black_king s) with (king s Black) in pf'.
+        change (white_king s) with (king s White) in pf'.
+        repeat rewrite (lookup_king) in pf'.
+        discriminate.
       * apply lookup_white_king.
       * apply neighbor_preadj_sym; auto.
   - apply (opp_to_play_not_in_check s (white_king s)).
     + rewrite s_play; apply lookup_white_king.
     + rewrite s_play.
-      exists (black_king s), King; split.
+      exists King, (black_king s); split; [|split].
+      * intro pf'.
+        apply (f_equal (fun p => lookup_piece p (board s))) in pf'.
+        change (black_king s) with (king s Black) in pf'.
+        change (white_king s) with (king s White) in pf'.
+        repeat rewrite (lookup_king) in pf'.
+        discriminate.
       * apply lookup_black_king.
       * auto.
 Qed.
@@ -2689,12 +2787,12 @@ Proof.
   }
   destruct (checkmate_neighborhood White s s_res up up_close)
     as [pf|pf].
-  - destruct pf as [p [pc [Hp1 Hp2]]].
+  - destruct pf as [pc [p [Hneq [Hp1 Hp2]]]].
     lookup_piece_inversion; try discriminate.
     destruct (KRvK_white_inv s p pos pc s_mat Hp1 s_rook)
       as [[? ?]|[? ?]]; subst.
     + destruct (checkmate_neighborhood White s s_res down down_close) as [pf'|pf'].
-      * destruct pf' as [p' [pc' [Hp'1 Hp'2]]].
+      * destruct pf' as [pc' [p' [Hneq' [Hp'1 Hp'2]]]].
         lookup_piece_inversion; try discriminate.
         destruct (KRvK_white_inv s p' pos pc' s_mat Hp'1 s_rook)
       as [[? ?]|[? ?]]; subst.
@@ -2797,12 +2895,12 @@ Proof.
   }
   destruct (checkmate_neighborhood White s s_res right right_close)
     as [pf|pf].
-  - destruct pf as [p [pc [Hp1 Hp2]]].
+  - destruct pf as [pc [p [Hneq [Hp1 Hp2]]]].
     lookup_piece_inversion; try discriminate.
     destruct (KRvK_white_inv s p pos pc s_mat Hp1 s_rook)
       as [[? ?]|[? ?]]; subst.
     + destruct (checkmate_neighborhood White s s_res left left_close) as [pf'|pf'].
-      * destruct pf' as [p' [pc' [Hp'1 Hp'2]]].
+      * destruct pf' as [pc' [p' [Hneq' [Hp'1 Hp'2]]]].
         lookup_piece_inversion; try discriminate.
         destruct (KRvK_white_inv s p' pos pc' s_mat Hp'1 s_rook)
       as [[? ?]|[? ?]]; subst.
@@ -2893,7 +2991,7 @@ Proof.
       rewrite fin_dist_refl; auto.
   }
   destruct (checkmate_neighborhood White s s_res v vn) as [thr|cl].
-  - destruct thr as [pos [pc [pf1 pf2]]].
+  - destruct thr as [pos [pc [pf_neq [pf1 pf2]]]].
     lookup_piece_inversion; try discriminate.
     eapply KRvK_white_inv in pf1; eauto.
     destruct pf1 as [[? ?]|[? ?]]; subst.
@@ -2959,7 +3057,7 @@ Proof.
     - rewrite second_file_dist; auto.
   }
   destruct (checkmate_neighborhood White s s_res h hn) as [thr|cl].
-  - destruct thr as [pos [pc [pf1 pf2]]].
+  - destruct thr as [pos [pc [pf_neq [pf1 pf2]]]].
     lookup_piece_inversion; try discriminate.
     eapply KRvK_white_inv in pf1; eauto.
     destruct pf1 as [[? ?]|[? ?]]; subst.
@@ -3048,7 +3146,7 @@ Proof.
       + unfold file_dist; lia.
     }
     destruct (checkmate_neighborhood White s s_res p pclose) as [thr|cl].
-    + destruct thr as [pos [pc [pf1 pf2]]].
+    + destruct thr as [pos [pc [pf_neq [pf1 pf2]]]].
       lookup_piece_inversion; try discriminate.
       eapply KRvK_white_inv in pf1; eauto.
       destruct pf1 as [[? ?]|[? ?]]; subst; [|contradiction].
@@ -3098,7 +3196,7 @@ Proof.
         rewrite fin_dist_refl; auto.
     }
     destruct (checkmate_neighborhood White s s_res p pclose) as [thr|cl].
-    + destruct thr as [pos [pc [pf1 pf2]]].
+    + destruct thr as [pos [pc [pf_neq [pf1 pf2]]]].
       lookup_piece_inversion; try discriminate.
       eapply KRvK_white_inv in pf1; eauto.
       destruct pf1 as [[? ?]|[? ?]]; subst; [|contradiction].
@@ -3139,7 +3237,7 @@ Proof.
         rewrite fin_dist_refl; auto.
     }
     destruct (checkmate_neighborhood White s s_res v vn) as [thr|cl].
-    + destruct thr as [pos [pc [pf1 pf2]]].
+    + destruct thr as [pos [pc [pf_neq [pf1 pf2]]]].
       lookup_piece_inversion; try discriminate.
       eapply KRvK_white_inv in pf1; eauto.
       destruct pf1 as [[? ?]|[? ?]]; subst.
@@ -3188,13 +3286,13 @@ Proof.
       - simpl; rewrite file_one_right_dist; auto.
     }
     destruct (checkmate_neighborhood White s s_res l ln) as [thr|cl].
-    + destruct thr as [pos [pc [pf1 pf2]]].
+    + destruct thr as [pos [pc [pf_neq [pf1 pf2]]]].
       lookup_piece_inversion; try discriminate.
       eapply KRvK_white_inv in pf1; eauto.
       destruct pf1 as [[? ?]|[? ?]]; subst.
       * destruct pf2 as [_ lf]. simpl in lf.
         destruct (checkmate_neighborhood White s s_res r rn) as [thr|cl].
-        -- destruct thr as [pos [pc [pf1 pf2]]].
+        -- destruct thr as [pos [pc [pf_neq' [pf1 pf2]]]].
            lookup_piece_inversion; try discriminate.
            eapply KRvK_white_inv in pf1; eauto.
            destruct pf1 as [[? ?]|[? ?]]; subst.
@@ -3279,7 +3377,7 @@ Proof.
       - rewrite second_file_dist; auto.
     }
     destruct (checkmate_neighborhood White s s_res h hn) as [thr|cl].
-    + destruct thr as [pos [pc [pf1 pf2]]].
+    + destruct thr as [pos [pc [pf_neq [pf1 pf2]]]].
       lookup_piece_inversion; try discriminate.
       eapply KRvK_white_inv in pf1; eauto.
       destruct pf1 as [[? ?]|[? ?]]; subst.
@@ -3328,13 +3426,13 @@ Proof.
       - simpl; rewrite second_file_dist; auto.
     }
     destruct (checkmate_neighborhood White s s_res d dn) as [thr|cl].
-    + destruct thr as [pos [pc [pf1 pf2]]].
+    + destruct thr as [pos [pc [pf_neq [pf1 pf2]]]].
       lookup_piece_inversion; try discriminate.
       eapply KRvK_white_inv in pf1; eauto.
       destruct pf1 as [[? ?]|[? ?]]; subst.
       * destruct pf2 as [dr _]. simpl in dr.
         destruct (checkmate_neighborhood White s s_res u un) as [thr|cl].
-        -- destruct thr as [pos [pc [pf1 pf2]]].
+        -- destruct thr as [pos [pc [pf_neq' [pf1 pf2]]]].
            lookup_piece_inversion; try discriminate.
            eapply KRvK_white_inv in pf1; eauto.
            destruct pf1 as [[? ?]|[? ?]]; subst.
@@ -3565,7 +3663,6 @@ Proof.
     destruct pf2 as [pf2 pf3].
     destruct Dec.eq_dec; try discriminate.
     simpl in *; congruence.
-
   - apply MaterialPositions.mp_of_board_correct1; auto.
 Qed.
 
@@ -3620,7 +3717,7 @@ Proof.
   rewrite s_play in chk.
   specialize (chk (black_king s) (lookup_black_king s)).
   unfold is_threatened_by in chk.
-  destruct chk as [pos' [piece [pf3 pf4]]].
+  destruct chk as [piece [pos' [pf_neq [pf3 pf4]]]].
   pose proof (mat := pf2).
   unfold material_eq in pf2.
   specialize (pf2 White piece).

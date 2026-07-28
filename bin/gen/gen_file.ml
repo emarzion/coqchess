@@ -18,7 +18,6 @@ let tup_to_json tup : string * t =
 let tups_to_json tups =
   `Assoc (List.map tup_to_json tups)
 
-(*
 let () =
   let {tb_whites; tb_blacks} = certified_Chess_TB in
   let oc_w = open_out "tb_w.json" in
@@ -32,4 +31,3 @@ let () =
   let () = close_out oc_w in
   let () = close_out oc_b in
   ()
-*)

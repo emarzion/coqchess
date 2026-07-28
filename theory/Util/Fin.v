@@ -78,6 +78,36 @@ Proof.
   apply dist_sym.
 Qed.
 
+Lemma fin_dist_refl {n} (i : Fin n) :
+  fin_dist i i = 0.
+Proof.
+  induction n.
+  - destruct i.
+  - destruct i as [|j].
+    + reflexivity.
+    + apply IHn.
+Qed.
+
+Lemma dist_0 x : forall y, Dist.dist x y = 0 ->
+  x = y.
+Proof.
+  induction x; intro y.
+  - simpl. lia.
+  - destruct y; simpl.
+    + lia.
+    + intro pf.
+      apply IHx in pf; lia.
+Qed.
+
+Lemma fin_dist_0 {n} (i j : Fin.Fin n) :
+  fin_dist i j = 0 -> i = j.
+Proof.
+  unfold fin_dist.
+  intro pf.
+  apply dist_0 in pf.
+  apply val_inj; auto.
+Qed.
+
 Definition fin_sbetween {n} : Fin n -> Fin n -> Fin n -> Prop :=
   fun i j k => sbetween (val i) (val j) (val k).
 
