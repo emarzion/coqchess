@@ -27,4 +27,7 @@ jobs:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           dune-cache: true
       - run: opam install . --deps-only
-      - run: opam exec -- dune build
+      - name: Build with increased stack
+        run: |
+          ulimit -s 65536
+          opam exec -- dune build
