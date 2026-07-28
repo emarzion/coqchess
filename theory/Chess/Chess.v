@@ -1941,6 +1941,94 @@ Proof.
         -- apply prev_val_None in Hprev2; lia.
 Qed.
 
+Lemma iter_nw_Some n p p' :
+  opt_iter northwest n p = Some p' <->
+  val (fst p') + n = val (fst p) /\
+  val (snd p') = val (snd p) + n.
+Proof.
+  split; generalize p p'; clear p p'.
+  - induction n; intros p p' pf.
+    + inversion pf; subst.
+      rewrite <- plus_n_O; now split.
+    + simpl in pf.
+      destruct northwest eqn:Hnw; [|discriminate].
+      unfold northwest, north, west in Hnw.
+      destruct (next (snd p)) eqn:Hnext2; [|discriminate].
+      simpl fst in Hnw.
+      destruct (prev (fst p)) eqn:Hprev1; [|discriminate].
+      simpl snd in Hnw.
+      apply prev_val_Some in Hprev1.
+      apply next_val_Some in Hnext2.
+      inversion Hnw; subst.
+      apply IHn in pf; simpl fst in *; destruct pf.
+      simpl snd in *; split; lia.
+  - induction n; intros p p' [pf1 pf2].
+    + simpl; f_equal.
+      rewrite <- plus_n_O in *.
+      apply val_inj in pf1, pf2.
+      apply injective_projections; auto.
+    + simpl.
+      destruct northwest eqn:Hnw.
+      * unfold northwest, north, west in Hnw.
+        destruct (next (snd p)) eqn:Hnext2; [|discriminate].
+        simpl fst in Hnw.
+        destruct (prev (fst p)) eqn:Hprev1; [|discriminate].
+        simpl snd in Hnw.
+        inversion Hnw; subst.
+        apply prev_val_Some in Hprev1.
+        apply next_val_Some in Hnext2.
+        apply IHn; split; simpl fst; simpl snd; lia.
+      * unfold northwest, north, west in Hnw.
+        destruct (next (snd p)) eqn:Hnext2.
+        -- simpl fst in Hnw.
+           destruct (prev (fst p)) eqn:Hprev1; [discriminate|].
+           apply prev_val_None in Hprev1; lia.
+        -- apply next_val_None with (j := snd p') in Hnext2; lia.
+Qed.
+
+Lemma iter_sw_Some n p p' :
+  opt_iter southwest n p = Some p' <->
+  val (fst p') + n = val (fst p) /\
+  val (snd p') + n = val (snd p).
+Proof.
+  split; generalize p p'; clear p p'.
+  - induction n; intros p p' pf.
+    + inversion pf; subst.
+      rewrite <- plus_n_O; now split.
+    + simpl in pf.
+      destruct southwest eqn:Hsw; [|discriminate].
+      unfold southwest, south, west in Hsw.
+      destruct (prev (snd p)) eqn:Hprev2; [|discriminate].
+      simpl fst in Hsw.
+      destruct (prev (fst p)) eqn:Hprev1; [|discriminate].
+      simpl snd in Hsw.
+      apply prev_val_Some in Hprev1, Hprev2.
+      inversion Hsw; subst.
+      apply IHn in pf; simpl fst in *; destruct pf.
+      simpl snd in *; split; lia.
+  - induction n; intros p p' [pf1 pf2].
+    + simpl; f_equal.
+      rewrite <- plus_n_O in *.
+      apply val_inj in pf1, pf2.
+      apply injective_projections; auto.
+    + simpl.
+      destruct southwest eqn:Hsw.
+      * unfold southwest, south, west in Hsw.
+        destruct (prev (snd p)) eqn:Hprev2; [|discriminate].
+        simpl fst in Hsw.
+        destruct (prev (fst p)) eqn:Hprev1; [|discriminate].
+        simpl snd in Hsw.
+        inversion Hsw; subst.
+        apply prev_val_Some in Hprev1, Hprev2.
+        apply IHn; split; simpl fst; simpl snd; lia.
+      * unfold southwest, south, west in Hsw.
+        destruct (prev (snd p)) eqn:Hprev1.
+        -- simpl fst in Hsw.
+           destruct (prev (fst p)) eqn:Hprev2; [discriminate|].
+           apply prev_val_None in Hprev2; lia.
+        -- apply prev_val_None in Hprev1; lia.
+Qed.
+
 Lemma wf_north : well_founded (rel_of_opt north).
 Proof.
   apply wf_incl with (R2 := fun p p' => Fin_gt (snd p) (snd p')).
@@ -2041,6 +2129,55 @@ Proof.
     unfold File, Rank, Fin in *.
     rewrite <- Hprev2.
     apply Arith_base.gt_Sn_n_stt.
+  - apply wf_inverse_image; exact Fin_lt_wf.
+Qed.
+
+Lemma wf_nw : well_founded (rel_of_opt northwest).
+Proof.
+  apply wf_incl with (R2 := fun p p' => Fin_gt (snd p) (snd p')).
+  - intros p p' pf.
+    unfold rel_of_opt in pf.
+    unfold northwest in pf.
+    destruct (north p') eqn:Hnorth; [|discriminate].
+    destruct (west p0) eqn:Hwest; [|discriminate].
+    inversion pf; subst.
+    unfold north in Hnorth.
+    destruct next eqn:Hnext2; [|discriminate].
+    unfold west in Hwest.
+    destruct (prev (fst p0)) eqn:Hprev1;
+      [|discriminate].
+    apply prev_val_Some in Hprev1.
+    apply next_val_Some in Hnext2.
+    unfold Fin_gt.
+    inversion Hnorth; subst.
+    simpl fst in *; simpl snd in *.
+    inversion Hwest; subst.
+    simpl snd. rewrite Hnext2.
+    apply Arith_base.gt_Sn_n_stt.
+  - apply wf_inverse_image; exact Fin_gt_wf.
+Qed.
+
+Lemma wf_sw : well_founded (rel_of_opt southwest).
+Proof.
+  apply wf_incl with (R2 := fun p p' => Fin_lt (snd p) (snd p')).
+  - intros p p' pf.
+    unfold rel_of_opt in pf.
+    unfold southwest in pf.
+    destruct (south p') eqn:Hsouth; [|discriminate].
+    destruct (west p0) eqn:Hwest; [|discriminate].
+    inversion pf; subst.
+    unfold south in Hsouth.
+    unfold Rank, File, Pos in *.
+    destruct (prev (snd p')) eqn:Hprev2; [|discriminate].
+    unfold west in Hwest.
+    destruct (prev (fst p0)) eqn:Hprev1;
+      [|discriminate].
+    apply prev_val_Some in Hprev1, Hprev2.
+    unfold Fin_lt.
+    inversion Hsouth; subst.
+    simpl fst in *; simpl snd in *.
+    inversion Hwest; subst.
+    simpl snd; lia.
   - apply wf_inverse_image; exact Fin_lt_wf.
 Qed.
 
@@ -2219,8 +2356,6 @@ Proof.
     + rewrite iter_north_Some.
       split; auto.
 Qed.
-
-(* bookmark *)
 
 Lemma is_east_threatened_correct1 b pl pos pos' :
   pos <> pos' ->
@@ -2698,10 +2833,54 @@ Definition is_se_threatened
     | None => false
     end.
 
+Definition is_nw_threatened
+  (b : Board) (pos : Pos) (pl : Player) : bool :=
+  let o := (find_first
+    (fun p => 
+      match lookup_piece p b with
+      | Some _ => neqb p pos
+      | None => false
+      end) northwest pos (wf_nw pos)) in
+    match o with
+    | Some pos' =>
+      match lookup_piece pos' b with
+      | Some (pl', pc) =>
+        match pc with
+        | Bishop | Queen => player_eqb pl pl'
+        | _ => false
+        end
+      | None => false
+      end
+    | None => false
+    end.
+
+Definition is_sw_threatened
+  (b : Board) (pos : Pos) (pl : Player) : bool :=
+  let o := (find_first
+    (fun p => 
+      match lookup_piece p b with
+      | Some _ => neqb p pos
+      | None => false
+      end) southwest pos (wf_sw pos)) in
+    match o with
+    | Some pos' =>
+      match lookup_piece pos' b with
+      | Some (pl', pc) =>
+        match pc with
+        | Bishop | Queen => player_eqb pl pl'
+        | _ => false
+        end
+      | None => false
+      end
+    | None => false
+    end.
+
 Definition is_diag_threatenedb
   (b : Board) (pos : Pos) (pl : Player) : bool :=
   is_ne_threatened b pos pl ||
-  is_se_threatened b pos pl.
+  is_se_threatened b pos pl ||
+  is_nw_threatened b pos pl ||
+  is_sw_threatened b pos pl.
 
 Lemma dist_translate_l x : forall y z,
   Dist.dist (x + y) (x + z) =
@@ -3033,6 +3212,310 @@ Proof.
         -- unfold rank in no_betw_r; lia.
 Qed.
 
+Lemma is_nw_threatened_correct1 b pl pos pos' :
+  pos <> pos' ->
+  (lookup_piece pos' b = Some (pl, Bishop) \/
+  lookup_piece pos' b = Some (pl, Queen)) ->
+  diag_adj b pos' pos ->
+  (val (fst pos') <= val (fst pos))%nat ->
+  (val (snd pos) <= val (snd pos'))%nat ->
+  is_nw_threatened b pos pl = true.
+Proof.
+  intros Hneq look pf_d le1 le2.
+  destruct (le_diff le1) as [dx Hdx].
+  destruct (le_diff le2) as [dy Hdy].
+  destruct pf_d as [diag no_betw].
+  unfold diag_preadj in diag.
+  assert (dx = dy).
+  { unfold rank_dist, file_dist, rank, file,
+      fin_dist in diag.
+    rewrite <- Hdx, <- Hdy in diag.
+    rewrite (Dist.dist_sym _ (val (snd pos))) in diag.
+    repeat rewrite dist_add in diag; auto.
+  }
+  subst.
+  unfold is_nw_threatened.
+  destruct find_first eqn:Hfind.
+  - pose proof (Hfind' := Hfind).
+    apply find_first_is_first in Hfind.
+    destruct Hfind as [n [Hn1 Hn2]].
+    rewrite iter_nw_Some in Hn1.
+    destruct Hn1 as [Hf Hr].
+    assert (n = dy).
+    { destruct (PeanoNat.Nat.lt_trichotomy n dy)
+        as [nd|[nd|nd]]; auto.
+      + apply find_first_pred in Hfind'.
+        rewrite no_betw in Hfind'; [discriminate| | |].
+        * unfold diag_preadj, rank, file,
+            rank_dist, file_dist, fin_dist.
+          rewrite <- Hdy, Hr.
+          rewrite <- (dist_translate_r n (val (fst pos'))).
+          rewrite Hf, <- Hdx.
+          repeat rewrite dist_translate_l.
+          apply Dist.dist_sym.
+        * left; unfold file.
+          rewrite <- Hf.
+          split; [lia|].
+          destruct n; [|lia].
+          assert (p = pos).
+          { rewrite <- plus_n_O in Hf, Hr.
+            apply val_inj in Hf, Hr.
+            apply injective_projections; auto.
+          }
+          subst.
+          destruct (lookup_piece pos b); [|discriminate].
+          unfold neqb in Hfind'.
+          destruct eq_dec;
+            [discriminate|contradiction].
+        * right; unfold rank; split; [|lia].
+          destruct n; [|lia].
+          assert (p = pos).
+          { rewrite <- plus_n_O in Hf, Hr.
+            apply val_inj in Hf, Hr.
+            apply injective_projections; auto.
+          }
+          subst.
+          destruct (lookup_piece pos b); [|discriminate].
+          unfold neqb in Hfind'.
+          destruct eq_dec;
+            [discriminate|contradiction].
+      + apply Hn2 with (z := pos') in nd.
+        * destruct look as [look|look];
+          rewrite look in nd.
+          -- unfold neqb in nd.
+             destruct eq_dec; [|discriminate].
+             subst; contradiction.
+          -- unfold neqb in nd.
+             destruct eq_dec; [|discriminate].
+             subst; contradiction.
+        * rewrite iter_nw_Some; split; auto.
+    }
+    subst.
+    assert (p = pos').
+    { apply injective_projections; apply val_inj; lia.
+    }
+    subst.
+    destruct look as [look|look]; rewrite look;
+      apply player_eqb_refl.
+  - apply find_first_None
+      with (n := dy) (y := pos') in Hfind.
+    + destruct look as [look|look];
+              rewrite look in Hfind.
+      * elim Hneq; unfold neqb in Hfind.
+        destruct eq_dec; [auto|discriminate].
+      * elim Hneq; unfold neqb in Hfind.
+        destruct eq_dec; [auto|discriminate].
+    + rewrite iter_nw_Some.
+      split; auto.
+Qed.
+
+Lemma is_nw_threatened_correct2 b pos pl :
+  is_nw_threatened b pos pl = true ->
+  is_diag_threatened b pos pl.
+Proof.
+  intro pf.
+  unfold is_nw_threatened in pf.
+  destruct find_first eqn:Hfind; [|discriminate].
+  pose proof (Hfind' := Hfind).
+  apply find_first_pred in Hfind.
+  destruct (lookup_piece p b) as [[pl' pc']|] eqn:Hlook;
+    [|discriminate].
+  unfold neqb in Hfind.
+  destruct eq_dec; [discriminate|].
+  exists p; split; auto; split.
+  - destruct pc'; try discriminate.
+    + apply player_eqb_true in pf; subst; now right.
+    + apply player_eqb_true in pf; subst.
+      now left.
+  - apply find_first_is_first in Hfind'.
+    destruct Hfind' as [d [Hd1 Hd2]].
+    split.
+    + rewrite iter_nw_Some in Hd1; destruct Hd1 as [df dr].
+      unfold diag_preadj, rank_dist, file_dist, fin_dist,
+        rank, file.
+      rewrite <- df, dr.
+      rewrite (Dist.dist_sym _ (val (snd pos))).
+      repeat rewrite dist_add; auto.
+    + intros p' diag no_betw_f no_betw_r.
+      rewrite iter_nw_Some in Hd1.
+      destruct Hd1 as [df dr].
+      destruct no_betw_f as [no_betw_f|no_betw_f].
+      * destruct no_betw_r as [no_betw_r|no_betw_r].
+        -- unfold rank in no_betw_r; lia.
+        -- destruct no_betw_f as [no_betw_f1 no_betw_f2].
+           destruct no_betw_r as [no_betw_r1 no_betw_r2].
+           destruct (lt_diff no_betw_f1) as [dx Hdx].
+           destruct (lt_diff no_betw_r1) as [dy Hdy].
+           destruct (lt_diff no_betw_f2) as [dx' Hdx'].
+           destruct (lt_diff no_betw_r2) as [dy' Hdy'].
+           unfold diag_preadj in diag.
+           unfold rank_dist, file_dist, rank, file,
+             fin_dist in *.
+           rewrite <- Hdx, <- Hdy' in diag.
+           rewrite (Dist.dist_sym _ (val (snd p')))
+             in diag.
+           repeat rewrite dist_add in diag; subst.
+           assert (dx' = dy) by lia; subst.
+           assert (dy < d)%nat as dy_d by lia.
+           setoid_rewrite iter_nw_Some in Hd2.
+           symmetry in Hdy.
+           specialize (Hd2 _ p' dy_d (conj Hdx' Hdy)).
+           destruct (lookup_piece p' b); auto.
+           unfold neqb in Hd2.
+           destruct eq_dec; [|discriminate].
+           subst; lia.
+      * unfold file in no_betw_f; lia.
+Qed.
+
+Lemma is_sw_threatened_correct1 b pl pos pos' :
+  pos <> pos' ->
+  (lookup_piece pos' b = Some (pl, Bishop) \/
+  lookup_piece pos' b = Some (pl, Queen)) ->
+  diag_adj b pos' pos ->
+  (val (fst pos') <= val (fst pos))%nat ->
+  (val (snd pos') <= val (snd pos))%nat ->
+  is_sw_threatened b pos pl = true.
+Proof.
+  intros Hneq look pf_d le1 le2.
+  destruct (le_diff le1) as [dx Hdx].
+  destruct (le_diff le2) as [dy Hdy].
+  destruct pf_d as [diag no_betw].
+  unfold diag_preadj in diag.
+  assert (dx = dy).
+  { unfold rank_dist, file_dist, rank, file,
+      fin_dist in diag.
+    rewrite <- Hdx, <- Hdy in diag.
+    repeat rewrite dist_add in diag; auto.
+  }
+  subst.
+  unfold is_sw_threatened.
+  destruct find_first eqn:Hfind.
+  - pose proof (Hfind' := Hfind).
+    apply find_first_is_first in Hfind.
+    destruct Hfind as [n [Hn1 Hn2]].
+    rewrite iter_sw_Some in Hn1.
+    destruct Hn1 as [Hf Hr].
+    assert (n = dy).
+    { destruct (PeanoNat.Nat.lt_trichotomy n dy)
+        as [nd|[nd|nd]]; auto.
+      + apply find_first_pred in Hfind'.
+        rewrite no_betw in Hfind'; [discriminate| | |].
+        * unfold diag_preadj, rank, file,
+            rank_dist, file_dist, fin_dist.
+          rewrite <- (dist_translate_r n _ (val (snd p))).
+          rewrite <- (dist_translate_r n _ (val (fst p))).
+          rewrite Hf, Hr, <- Hdx, <- Hdy.
+          repeat rewrite dist_translate_l; auto.
+        * left; unfold file.
+          split; [lia|].
+          destruct n; [|lia].
+          assert (p = pos).
+          { rewrite <- plus_n_O in Hf, Hr.
+            apply val_inj in Hf, Hr.
+            apply injective_projections; auto.
+          }
+          subst.
+          destruct (lookup_piece pos b); [|discriminate].
+          unfold neqb in Hfind'.
+          destruct eq_dec;
+            [discriminate|contradiction].
+        * left; unfold rank.
+          split; [lia|].
+          destruct n; [|lia].
+          assert (p = pos).
+          { rewrite <- plus_n_O in Hf, Hr.
+            apply val_inj in Hf, Hr.
+            apply injective_projections; auto.
+          }
+          subst.
+          destruct (lookup_piece pos b); [|discriminate].
+          unfold neqb in Hfind'.
+          destruct eq_dec;
+            [discriminate|contradiction].
+      + apply Hn2 with (z := pos') in nd.
+        * destruct look as [look|look];
+          rewrite look in nd.
+          -- unfold neqb in nd.
+             destruct eq_dec; [|discriminate].
+             subst; contradiction.
+          -- unfold neqb in nd.
+             destruct eq_dec; [|discriminate].
+             subst; contradiction.
+        * rewrite iter_sw_Some; split; auto.
+    }
+    subst.
+    assert (p = pos').
+    { apply injective_projections; apply val_inj; lia.
+    }
+    subst.
+    destruct look as [look|look]; rewrite look;
+      apply player_eqb_refl.
+  - apply find_first_None
+      with (n := dy) (y := pos') in Hfind.
+    + destruct look as [look|look];
+              rewrite look in Hfind.
+      * elim Hneq; unfold neqb in Hfind.
+        destruct eq_dec; [auto|discriminate].
+      * elim Hneq; unfold neqb in Hfind.
+        destruct eq_dec; [auto|discriminate].
+    + rewrite iter_sw_Some.
+      split; auto.
+Qed.
+
+Lemma is_sw_threatened_correct2 b pos pl :
+  is_sw_threatened b pos pl = true ->
+  is_diag_threatened b pos pl.
+Proof.
+  intro pf.
+  unfold is_sw_threatened in pf.
+  destruct find_first eqn:Hfind; [|discriminate].
+  pose proof (Hfind' := Hfind).
+  apply find_first_pred in Hfind.
+  destruct (lookup_piece p b) as [[pl' pc']|] eqn:Hlook;
+    [|discriminate].
+  unfold neqb in Hfind.
+  destruct eq_dec; [discriminate|].
+  exists p; split; auto; split.
+  - destruct pc'; try discriminate.
+    + apply player_eqb_true in pf; subst; now right.
+    + apply player_eqb_true in pf; subst.
+      now left.
+  - apply find_first_is_first in Hfind'.
+    destruct Hfind' as [d [Hd1 Hd2]].
+    split.
+    + rewrite iter_sw_Some in Hd1; destruct Hd1 as [df dr].
+      unfold diag_preadj, rank_dist, file_dist, fin_dist,
+        rank, file.
+      rewrite <- df, <- dr.
+      repeat rewrite dist_add; auto.
+    + intros p' diag no_betw_f no_betw_r.
+      rewrite iter_sw_Some in Hd1.
+      destruct Hd1 as [df dr].
+      destruct no_betw_f as [no_betw_f|no_betw_f].
+      * destruct no_betw_r as [no_betw_r|no_betw_r].
+        -- destruct no_betw_f as [no_betw_f1 no_betw_f2].
+           destruct no_betw_r as [no_betw_r1 no_betw_r2].
+           destruct (lt_diff no_betw_f1) as [dx Hdx].
+           destruct (lt_diff no_betw_r1) as [dy Hdy].
+           destruct (lt_diff no_betw_f2) as [dx' Hdx'].
+           destruct (lt_diff no_betw_r2) as [dy' Hdy'].
+           unfold diag_preadj in diag.
+           unfold rank_dist, file_dist, rank, file,
+             fin_dist in *.
+           rewrite <- Hdx, <- Hdy in diag.
+           repeat rewrite dist_add in diag; subst.
+           assert (dx' = dy') by lia; subst.
+           assert (dy' < d)%nat as dy'_d by lia.
+           setoid_rewrite iter_sw_Some in Hd2.
+           specialize (Hd2 _ p' dy'_d (conj Hdx' Hdy')).
+           destruct (lookup_piece p' b); auto.
+           unfold neqb in Hd2.
+           destruct eq_dec; [|discriminate].
+           subst; lia.
+        -- unfold rank in no_betw_r; lia.
+      * unfold file in no_betw_f; lia.
+Qed.
+
 Lemma is_diag_threatened_iff b pos pl :
   is_diag_threatened b pos pl <->
   is_diag_threatenedb b pos pl = true.
@@ -3046,21 +3529,25 @@ Proof.
     destruct (PeanoNat.Nat.le_ge_cases
       (val (snd pos)) (val (snd pos'))).
     (* NE *)
-    + left; apply is_ne_threatened_correct1
+    + left; left; left; apply is_ne_threatened_correct1
         with (pos' := pos'); auto.
     (* SE *)
-    + right; apply is_se_threatened_correct1
+    + left; left; right; apply is_se_threatened_correct1
         with (pos' := pos'); auto.
     (* NW *)
-    + admit.
+    + left; right; apply is_nw_threatened_correct1
+        with (pos' := pos'); auto.
     (* SW *)
-    + admit.
+    + right; apply is_sw_threatened_correct1
+        with (pos' := pos'); auto.
   - unfold is_diag_threatenedb in pf.
     repeat rewrite orb_true_iff in pf.
-    destruct pf.
+    destruct pf as [[[|]|]|].
     + now apply is_ne_threatened_correct2.
     + now apply is_se_threatened_correct2.
-Admitted.
+    + now apply is_nw_threatened_correct2.
+    + now apply is_sw_threatened_correct2.
+Qed.
 
 Definition is_threatened_byb (b : Board) (pos : Pos) (pl : Player) : bool :=
      is_threatened_by_knight b pos pl
