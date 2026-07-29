@@ -64,8 +64,14 @@ Proof.
   unfold is_threatened_by in pf.
   intro pf'.
   apply pf.
-  exists (king s (chess_to_play s)), King.
-  split.
+  exists King, (king s (chess_to_play s)); split; [|split].
+  - intro Heq.
+    absurd (lookup_piece (king s (chess_to_play s))
+      (board s) = Some (chess_to_play s, King)).
+    + rewrite <- Heq.
+      rewrite lookup_king; intro Heq'; inversion Heq'.
+      elim (opp_no_fp (chess_to_play s)); auto.
+    + apply lookup_king.
   - apply lookup_king.
   - simpl.
     unfold neighbor_adj.
@@ -87,11 +93,11 @@ Proof.
   destruct (chk
     (king s (chess_to_play s))
     (lookup_king _ _)
-    ) as [pos [p [Hp1 Hp2]]].
+    ) as [pc [p [Hneq [Hp1 Hp2]]]].
   inversion pf2 as [pf3].
   rewrite pf3 in Hp1.
   unfold non_pawn_piece_adj in Hp2.
-  assert (p = King) as pf by
+  assert (pc = King) as pf by
     (eapply only_king_lookup_piece; eauto).
   subst.
   unfold neighbor_adj in Hp2.

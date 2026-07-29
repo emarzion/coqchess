@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         ocaml-compiler:
-          - 4.14.x
+          - 4.14.2
 
     steps:
       - name: Checkout code
@@ -27,4 +27,7 @@ jobs:
           ocaml-compiler: ${{ matrix.ocaml-compiler }}
           dune-cache: true
       - run: opam install . --deps-only
-      - run: opam exec -- dune build
+      - name: Build with increased stack
+        run: |
+          ulimit -s 65536
+          opam exec -- dune build
