@@ -17,6 +17,10 @@ install: [dune install]
 depends: [
   "ocaml" {>= "4.14.0"}
   "coq" {= "8.19.0"}
+  "js_of_ocaml" {>= "5.0"}
+  "js_of_ocaml-ppx" {>= "5.0"}
+  "js_of_ocaml-tyxml" {>= "5.0"}
+  "tyxml" {>= "4.0"}
   "games"
   "coqtbgen"
 ]

@@ -1,0 +1,28 @@
+(coq.extraction
+  (prelude ExtractQuery)
+  (extracted_modules
+    ExtractQuery
+  )
+  (theories Games TBGen Chess))
+
+(library
+  (name query)
+  (modules
+    ;; Patch code
+    M
+    Uint63
+
+    ;; Extracted code
+    ExtractQuery
+
+    ;; Ocaml code
+    read_file
+  )
+  (libraries yojson extracted_code))
+
+(env
+  (dev
+    (flags (:standard -w -39 -w -33 -w -20))
+    (ocamlopt_flags (:standard -O3)))
+  (release
+    (ocamlopt_flags (:standard -O3))))

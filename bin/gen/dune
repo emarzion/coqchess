@@ -24,7 +24,7 @@
 (executable
   (name gen_file)
   (modules gen_file)
-  (libraries extracted_code yojson))
+  (libraries yojson extracted_code))
 
 (rule
   (targets tb_w.json tb_b.json)
