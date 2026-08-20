@@ -1,9 +1,11 @@
 Require Import List.
+Require Import Lia.
 Import ListNotations.
 Require Import String.
 
 Require Import TBGen.StratSymTB.OCamlTB.
 
+Require Import Games.Util.Dec.
 Require Import Games.Game.Player.
 
 Require Import Chess.Chess.
@@ -70,12 +72,22 @@ Definition guard (b : bool) (msg : string) : Error unit :=
   | false => error msg
   end.
 
-Definition pre_mk_KRvK_bound (to_play : Player)
-  (data : list (Player * Piece * Pos)) :
+Record EditBoard : Type := {
+  edit_to_play : Player;
+  edit_board : Board;
+  }.
+
+Definition init_edit : EditBoard := {|
+  edit_to_play := White;
+  edit_board := blank_board;
+  |}.
+
+Definition mkPreChessState (e : EditBoard) :
   Error PreChessState.
 Proof.
-  pose (b := place_pieces data).
-  pose (m := mp_of_board b).
+  pose (b := edit_board e).
+  pose (pl := edit_to_play e).
+  pose (m := mp_of_board (edit_board e)).
   unfold material_positions in m.
   refine (mbind (get_king White m) (fun wk => _)).
   refine (mbind (get_king Black m) (fun bk => _)).
@@ -88,16 +100,16 @@ Proof.
   refine (mbind (verify_empty White Knight m) (fun _ => _)).
   refine (mbind (verify_empty Black Knight m) (fun _ => _)).
   pose (opp_king :=
-    match to_play with
+    match pl with
     | White => bk
     | Black => wk
     end).
   refine (mbind (guard
-    (negb (is_threatened_byb b opp_king to_play))
+    (negb (is_threatened_byb b opp_king pl))
     illegal_check_msg)
     (fun _ => _)).
   exact (mret {|
-    pre_chess_to_play := to_play;
+    pre_chess_to_play := pl;
     pre_board := b;
     pre_white_king := wk;
     pre_black_king := bk;
@@ -178,9 +190,9 @@ Proof.
   destruct m; simpl; auto.
 Qed.
 
-Lemma mk_KRvK_bound_white_king to_play data :
+Lemma mkPreChessState_white_king e :
   lift (fun s => lookup_piece (pre_white_king s) (pre_board s)
-  = Some (White, King)) (pre_mk_KRvK_bound to_play data).
+  = Some (White, King)) (mkPreChessState e).
 Proof.
   eapply lift_bind; [apply get_king_correct|].
   intros wk Hwk.
@@ -192,9 +204,9 @@ Proof.
   rewrite Hwk; now left.
 Qed.
 
-Lemma mk_KRvK_bound_black_king to_play data :
+Lemma mkPreChessState_black_king e :
   lift (fun s => lookup_piece (pre_black_king s) (pre_board s)
-  = Some (Black, King)) (pre_mk_KRvK_bound to_play data).
+  = Some (Black, King)) (mkPreChessState e).
 Proof.
   eapply lift_bind; [apply lift_triv|].
   intros wk _.
@@ -206,10 +218,10 @@ Proof.
   rewrite Hbk; now left.
 Qed.
 
-Lemma mk_KRvK_bound_kings_unique to_play data :
+Lemma mkPreChessState_kings_unique e :
   lift (fun s => forall pl pos,
     lookup_piece pos (pre_board s) = Some (pl, King) ->
-    pos = pre_king s pl) (pre_mk_KRvK_bound to_play data).
+    pos = pre_king s pl) (mkPreChessState e).
 Proof.
   eapply lift_bind; [apply get_king_correct|].
   intros wk wk_uniq.
@@ -226,12 +238,12 @@ Proof.
     now destruct Hpos as [[]|[]].
 Qed.
 
-Lemma mk_KRvK_bound_no_check to_play data :
+Lemma mkPreChessState_no_check e :
   lift (fun s => forall pos,
     lookup_piece pos (pre_board s) =
     Some (opp (pre_chess_to_play s), King) ->
     ~ is_threatened_by (pre_board s) pos (pre_chess_to_play s))
-  (pre_mk_KRvK_bound to_play data).
+  (mkPreChessState e).
 Proof.
   eapply lift_bind; [apply get_king_correct|].
   intros wk pf_wk.
@@ -246,19 +258,17 @@ Proof.
   simpl in *.
   apply mp_of_board_correct1 in pf_look.
   intro thr; apply no_thr.
-  destruct to_play.
+  destruct edit_to_play.
   - simpl in *; rewrite pf_bk in pf_look.
     destruct pf_look as [|[]]; now subst.
   - simpl in *; rewrite pf_wk in pf_look.
     destruct pf_look as [|[]]; now subst.
 Qed.
 
-Require Import Lia.
-
-Lemma mk_KRvK_bound_is_bound to_play data :
+Lemma mkPreChessState_is_bound e :
   lift (fun s => forall pl pc,
     count pl pc (pre_board s) <= KRvK pl pc)
-  (pre_mk_KRvK_bound to_play data).
+  (mkPreChessState e).
 Proof.
   eapply lift_bind; [apply get_king_correct|].
   intros wk pf_wk.
@@ -305,18 +315,17 @@ Qed.
 Notation "p */\ q" := (lift_and_intro p q)
   (right associativity, at level 55).
 
-Definition mk_KRvK_bound (to_play : Player)
-  (data : list (Player * Piece * Pos)) :
+Definition mk_KRvK_bound (e : EditBoard) :
   Error ChessState.
 Proof.
   pose proof (
-    (mk_KRvK_bound_white_king to_play data) */\
-    (mk_KRvK_bound_black_king to_play data) */\
-    (mk_KRvK_bound_kings_unique to_play data) */\
-    (mk_KRvK_bound_no_check to_play data)
+    (mkPreChessState_white_king e) */\
+    (mkPreChessState_black_king e) */\
+    (mkPreChessState_kings_unique e) */\
+    (mkPreChessState_no_check e)
   ) as pfs.
   refine (cond_monad_map
-    (pre_mk_KRvK_bound to_play data) pfs _).
+    (mkPreChessState e) pfs _).
   intros s [wk [bk [uniq no_chk]]].
   exact {|
     chess_to_play := pre_chess_to_play s;
@@ -330,23 +339,23 @@ Proof.
   |}.
 Defined.
 
-Lemma mk_KRvK_bound_material_bound to_play data :
-  lift (material_bound KRvK) (mk_KRvK_bound to_play data).
+Lemma mk_KRvK_material_bound e :
+  lift (material_bound KRvK) (mk_KRvK_bound e).
 Proof.
   unfold mk_KRvK_bound.
   eapply lift_cond_monad_map;
-    [|apply mk_KRvK_bound_is_bound].
+    [|apply mkPreChessState_is_bound].
   simpl; intros s Hs [? [? [? ?]]].
   unfold material_bound; simpl.
   apply Hs.
 Qed.
 
-Theorem mk_KRvK_sound to_play data s :
-  mk_KRvK_bound to_play data = success s ->
+Theorem mk_KRvK_sound e s :
+  mk_KRvK_bound e = success s ->
   material_bound KRvK s.
 Proof.
   intro pf.
-  pose proof (mk_KRvK_bound_material_bound to_play data) as pf'.
+  pose proof (mk_KRvK_material_bound e) as pf'.
   rewrite pf in pf'.
   auto.
 Qed.
@@ -424,103 +433,6 @@ Proof.
       apply pf; now left.
 Qed.
 
-Lemma mk_board_get_data s :
-  material_bound KRvK s ->
-  place_pieces (get_data s) = board s.
-Proof.
-  intro.
-  apply place_pieces_eq.
-  - unfold get_data.
-    intros pl pc p pf.
-    destruct pf as [wk|[bk|wr]].
-    + inversion wk; subst.
-      apply s.
-    + inversion bk; subst.
-      apply s.
-    + rewrite in_map_iff in wr.
-      destruct wr as [pos [Hpos1 Hpos2]].
-      inversion Hpos1; subst.
-      apply mp_of_board_correct2; auto.
-  - intros.
-    unfold get_data.
-    simpl map.
-    rewrite map_map.
-    specialize (H pl pc).
-    destruct pl, pc; simpl in *.
-    + rewrite list_count_zero.
-      * apply king_count.
-      * intro pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; discriminate.
-    + rewrite list_count_zero.
-      * lia.
-      * intro pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; discriminate.
-    + rewrite list_count_len.
-      * rewrite map_length.
-        symmetry; apply mp_of_board_count.
-      * intros [] pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; auto.
-    + rewrite list_count_zero.
-      * lia.
-      * intro pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; discriminate.
-    + rewrite list_count_zero.
-      * lia.
-      * intro pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; discriminate.
-    + rewrite list_count_zero.
-      * apply king_count.
-      * intro pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; discriminate.
-    + rewrite list_count_zero.
-      * lia.
-      * intro pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; discriminate.
-    + rewrite list_count_zero.
-      * lia.
-      * intro pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; discriminate.
-    + rewrite list_count_zero.
-      * lia.
-      * intro pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; discriminate.
-    + rewrite list_count_zero.
-      * lia.
-      * intro pf.
-        rewrite in_map_iff in pf.
-        destruct pf as [? [? ?]]; discriminate.
-  - simpl. repeat constructor.
-    + intros [|].
-      * apply (f_equal (fun p =>
-          lookup_piece p (board s))) in H0.
-        rewrite lookup_black_king in H0.
-        rewrite lookup_white_king in H0.
-        discriminate.
-      * rewrite map_map in H0; simpl.
-        rewrite map_id in H0.
-        apply mp_of_board_correct2 in H0.
-        rewrite lookup_white_king in H0.
-        discriminate.
-    + intro pf.
-      rewrite map_map in pf; simpl.
-        rewrite map_id in pf.
-        apply mp_of_board_correct2 in pf.
-        rewrite lookup_black_king in pf.
-        discriminate.
-    + rewrite map_map; simpl.
-      rewrite map_id.
-      apply mp_of_board_NoDup.
-Qed.
-
 Lemma get_king_returns : forall s pl,
   returns
     (get_king pl (mp_of_board (board s)))
@@ -566,15 +478,26 @@ Proof.
   reflexivity.
 Qed.
 
+Definition EditBoard_of_PreChessState (s : PreChessState)
+  : EditBoard := {|
+  edit_to_play := pre_chess_to_play s;
+  edit_board := pre_board s;
+  |}.
+
 Lemma pre_mk_KRvK_bound_returns : forall s,
   material_bound KRvK s ->
   returns
-  (pre_mk_KRvK_bound (chess_to_play s) (get_data s))
+  (mkPreChessState
+    (EditBoard_of_PreChessState
+      (PreChessState_of_ChessState s)
+    ))
   (PreChessState_of_ChessState s).
 Proof.
   intros s Hs.
-  unfold pre_mk_KRvK_bound.
-  rewrite mk_board_get_data; auto.
+  unfold PreChessState_of_ChessState.
+  unfold EditBoard_of_PreChessState.
+  unfold mkPreChessState.
+  simpl.
   eapply mbind_returns; [apply get_king_returns|].
   eapply mbind_returns; [apply get_king_returns|].
   eapply mbind_returns;
@@ -591,11 +514,14 @@ Qed.
 
 Lemma mk_KRvK_bound_returns : forall s,
   material_bound KRvK s ->
-  exists to_play data,
-    returns (mk_KRvK_bound to_play data) s.
+  exists e,
+    returns (mk_KRvK_bound e) s.
 Proof.
   intros s Hs.
-  exists (chess_to_play s), (get_data s).
+  exists {|
+    edit_to_play := chess_to_play s;
+    edit_board := board s;
+  |}.
   eapply cond_monad_map_returns;
     [apply pre_mk_KRvK_bound_returns|]; auto.
   intros [? [? [? ?]]].
@@ -604,8 +530,246 @@ Qed.
 
 Theorem mk_KRvK_complete : forall s,
   material_bound KRvK s ->
-  exists to_play data,
-    mk_KRvK_bound to_play data = success s.
+  exists e,
+    mk_KRvK_bound e = success s.
 Proof.
   exact mk_KRvK_bound_returns.
+Qed.
+
+Record EditMove := {
+  orig : Pos;
+  dest : Pos;
+  }.
+
+Definition toggle_player (e : EditBoard) : EditBoard := {|
+  edit_to_play := opp (edit_to_play e);
+  edit_board := edit_board e;
+  |}.
+
+Definition execEditMove (m : EditMove)
+  (e : EditBoard) : EditBoard := {|
+    edit_to_play := edit_to_play e;
+    edit_board :=
+      match lookup_piece (orig m) (edit_board e) with
+      | Some (pl, pc) =>
+          place_piece pl pc (dest m)
+            (clear (orig m) (edit_board e))
+      | None => edit_board e
+      end;
+  |}.
+
+Definition verify_legal_msg : string :=
+  "Error: verify_legal".
+
+Arguments dec P {_}.
+
+Definition verify_origin (s : ChessState) (m : PreMove) :
+  Error (lookup_piece (origin m) (board s) = Some (chess_to_play s, piece m)).
+Proof.
+  match goal with
+  | |- Error ?P => destruct (dec P)
+  end.
+  - exact (mret e).
+  - exact (error verify_legal_msg).
+Defined.
+
+Definition verify_dest (s : ChessState) (m : PreMove) :
+  Error (open (chess_to_play s) (board s) (Chess.dest m)).
+Proof.
+  match goal with
+  | |- Error ?P => destruct (dec P)
+  end.
+  - exact (mret o).
+  - exact (error verify_legal_msg).
+Defined.
+
+Definition verify_adj (s : ChessState) (m : PreMove) :
+  Error (non_pawn_piece_adj (piece m) (board s)
+    (origin m) (Chess.dest m)).
+Proof.
+  match goal with
+  | |- Error ?P => destruct (dec P)
+  end.
+  - exact (mret n).
+  - exact (error verify_legal_msg).
+Defined.
+
+Definition verify_no_chk (s : ChessState) (m : PreMove) :
+  Error (
+    let upd :=
+      (clear (origin m)
+        (place_piece (chess_to_play s) 
+          (piece m) (Chess.dest m) (board s))) in
+      forall pos,
+        lookup_piece pos upd = Some (chess_to_play s, King) ->
+        ~ is_threatened_by upd pos (opp (chess_to_play s))).
+Proof.
+  cbv zeta.
+  match goal with
+  | |- Error ?P => destruct (dec P)
+  end.
+  - exact (mret n).
+  - exact (error verify_legal_msg).
+Defined.
+
+Definition verify_legal (s : ChessState) (m : PreMove) : Error (legal s m).
+Proof.
+  refine (mbind (verify_origin s m) (fun pf1 => _)).
+  refine (mbind (verify_dest s m) (fun pf2 => _)).
+  refine (mbind (verify_adj s m) (fun pf3 => _)).
+  refine (mbind (verify_no_chk s m) (fun pf4 => _)).
+  exact (mret {|
+    origin_lookup := pf1;
+    dest_open := pf2;
+    origin_dest_adj := pf3;
+    no_resulting_check := pf4;
+  |}).
+Defined.
+
+Lemma verify_origin_returns s m (pf : legal s m) :
+  returns (verify_origin s m) (origin_lookup pf).
+Proof.
+  unfold verify_origin.
+  destruct dec.
+  - apply mret_returns_eq.
+    apply UIP.UIP.
+  - elim n.
+    apply pf.
+Qed.
+
+Lemma verify_dest_returns s m (pf : legal s m) :
+  returns (verify_dest s m) (dest_open pf).
+Proof.
+  unfold verify_dest.
+  destruct dec.
+  - apply mret_returns_eq.
+    apply UIP.UIP.
+  - elim n.
+    apply pf.
+Qed.
+
+Lemma verify_adj_returns s m (pf : legal s m) :
+  returns (verify_adj s m) (origin_dest_adj pf).
+Proof.
+  unfold verify_adj.
+  destruct dec.
+  - apply mret_returns_eq.
+    apply UIP.UIP.
+  - elim n.
+    apply pf.
+Qed.
+
+Lemma verify_no_chk_returns s m (pf : legal s m) :
+  returns (verify_no_chk s m) (no_resulting_check pf).
+Proof.
+  unfold verify_no_chk.
+  destruct dec.
+  - apply mret_returns_eq.
+    apply UIP.UIP.
+  - elim n.
+    apply (no_resulting_check pf).
+Qed.
+
+Lemma verify_legal_returns s m (pf : legal s m) :
+  returns (verify_legal s m) pf.
+Proof.
+  apply mbind_returns with (x := origin_lookup pf);
+    [apply verify_origin_returns|].
+  eapply mbind_returns with (x := dest_open pf);
+    [apply verify_dest_returns|].
+  eapply mbind_returns with (x := origin_dest_adj pf);
+    [apply verify_adj_returns|].
+  eapply mbind_returns with (x := no_resulting_check pf);
+    [apply verify_no_chk_returns|].
+  destruct pf.
+  apply mret_returns.
+Qed.
+
+Definition wrong_color : string :=
+  "Error: wrong color".
+
+Definition empty_square : string :=
+  "Error: empty square".
+
+Definition buildPreMove (m : EditMove) (e : EditBoard) : Error PreMove :=
+  let b := edit_board e in
+  let pl := edit_to_play e in
+  match lookup_piece (orig m) b with
+  | Some (pl', pc) =>
+     mbind (guard (player_eqb pl pl') wrong_color) (fun _ =>
+     mret {|
+        piece := pc;
+        origin := orig m;
+        Chess.dest := dest m;
+      |})
+  | None => error empty_square
+  end.
+
+Definition forgetPreMove (m : PreMove) : EditMove := {|
+  orig := origin m;
+  dest := Chess.dest m;
+  |}.
+
+Definition forgetRegularMove {s} (m : RegularMove s) : EditMove :=
+  forgetPreMove (premove m).
+
+Definition forgetMove {s} (m : ChessMove s) : EditMove :=
+  match m with
+  | reg_move _ m' => forgetRegularMove m'
+  end.
+
+Lemma buildPreMove_returns {s} (m : RegularMove s) :
+  returns (buildPreMove (forgetRegularMove m)
+    (EditBoard_of_PreChessState (PreChessState_of_ChessState s)))
+    (premove m).
+Proof.
+  unfold buildPreMove.
+  destruct m; simpl.
+  rewrite (origin_lookup premove_legal).
+  eapply mbind_returns.
+  - apply guard_returns.
+    apply player_eqb_refl.
+  - destruct premove.
+    apply mret_returns.
+Qed.
+
+Definition buildRegularMove (m : EditMove) (s : ChessState)
+  : Error (RegularMove s) :=
+  mbind (buildPreMove m
+    (EditBoard_of_PreChessState
+      (PreChessState_of_ChessState s))) (fun m =>
+    (mbind (verify_legal s m) (fun pf =>
+    mret {|
+      premove := m;
+      premove_legal := pf
+    |}))).
+
+Definition buildMove (m : EditMove) (s : ChessState)
+  : Error (ChessMove s) :=
+  mbind (buildRegularMove m s) (fun r => mret (reg_move s r)).
+
+Lemma buildRegularMove_returns {s} (r : RegularMove s) :
+  returns (buildRegularMove (forgetRegularMove r) s) r.
+Proof.
+  eapply mbind_returns.
+  - apply buildPreMove_returns.
+  - apply mbind_returns with (x := premove_legal r).
+    + apply verify_legal_returns.
+    + destruct r; apply mret_returns.
+Qed.
+
+Lemma buildMove_return {s} (m : ChessMove s) :
+  returns (buildMove (forgetMove m) s) m.
+Proof.
+  destruct m.
+  eapply mbind_returns.
+  - apply buildRegularMove_returns.
+  - apply mret_returns.
+Qed.
+
+Lemma buildMove_complete s (m : ChessMove s) :
+  exists em, buildMove em s = success m.
+Proof.
+  exists (forgetMove m).
+  apply buildMove_return.
 Qed.
