@@ -37,10 +37,10 @@ jobs:
       - name: Install opam dependencies
         run: opam install . --deps-only
 
-      - name: Build
+      - name: Build tablebase
         run: |
           ulimit -s 65536
-          opam exec -- dune build
+          opam exec -- dune build --cache=enabled
 
       - name: Prepare site
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
